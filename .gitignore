@@ -1,0 +1,14 @@
+.cache/
+.build/
+build/
+dist/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.key
+*.mobileprovision
+*.provisionprofile

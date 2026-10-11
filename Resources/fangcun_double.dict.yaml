@@ -1,0 +1,9 @@
+---
+name: fangcun_double
+version: "1.0"
+sort: by_weight
+import_tables:
+  - pinyin_simp
+  - base
+  - fangcun_english
+...

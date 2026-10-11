@@ -1,0 +1,12 @@
+config_version: "1.1"
+schema_list:
+  - schema: translate_type
+  - schema: fangcun_sogou
+  - schema: fangcun_flypy
+  - schema: fangcun_natural
+  - schema: fangcun_microsoft
+  - schema: fangcun_abc
+  - schema: fangcun_jiajia
+  - schema: fangcun_ziguang
+menu:
+  page_size: 5

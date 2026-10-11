@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-10-10T21:43:45.893312+08:00",
+  "installed_build": "11",
+  "macos": "14.7.4",
+  "source_sha256": {
+    "Sources/AppPresence.swift": "3140d807bc912f3a53f85910feaf897ccfcac244f165be029903b43d9d3babc7",
+    "Sources/CandidatePanel.swift": "e4464d29fd02089359730abf35b816e17760c450840a895e52031e7e2859f4a1",
+    "Sources/CompositionSession.swift": "1f26b4cb1807d14adb7f02b386f0d51e7ca2203049de57b04c6b92e0a0391986",
+    "Sources/Configuration.swift": "3093542ea6db1a6e90cef19b56c3f6f2dbefb4255bddc36626196f29a682450e",
+    "Sources/EditingWindow.swift": "4c8a6e8cfebcf68f2b0eaa41d69e88729df67657644f2a6f05ea1b827c2d6e56",
+    "Sources/InputController.swift": "f98153e1c7c1e8657dfde1893097c818ba01ba3e1385f7a671c478553ec41817",
+    "Sources/InputSourceStatus.swift": "71450c814b5866dc4e71bc45eb79f2337002a881a055b0c5859adc6dc18bc9b6",
+    "Sources/PinyinEngine.swift": "41fbfc702cd7965140fc27b47445600d47b301dc78c1ac8a43a59f31b4f9ab92",
+    "Sources/RimeBridge.h": "3e4b08878214364e48f1f934a775ea9e8b05ec7bcd85ce83da199e05dd8c8b9a",
+    "Sources/RimeBridge.m": "309edbf69c04a286cd543669a68cd1a07c607b80cd10c58c6492bd7136384661",
+    "Sources/SettingsWindow.swift": "86fa1b0892468d524350e2451c622f3f7674762994e51c4bd3e5f55ecc772270",
+    "Sources/ShiftTap.swift": "41a1352ba802b6fb6c6be25e9ee4048f88120a439ec5f70544b7446cbb65f898",
+    "Sources/TranslationClient.swift": "e5173f305d1581e156b274eabca7a34b1ad6b64513ce9b1c1154b46ccc14b4b8",
+    "Sources/main.swift": "5fa1b35d92b3612b0a33cfc52987cf49a15fb43516914b55780aa6b5208b123d"
+  },
+  "schema_sha256": "84c7c04de5f6cb80b1c01685571d1d06d68346880d42717fa98eb8923cf7d424",
+  "test_sha256": {
+    "Tests/InputBehaviorAudit.swift": "cfefa59d7da508c193fec424e8e9cbd847f0c7ab9dc06e5c5f4144018b2027cd",
+    "Tests/ClientBehaviorAudit.swift": "5f94f662a43fa551b9a5810ce4b9329345a2a25cf46c83fe940653cddf37f93f",
+    "Tests/TextClient.swift": "93c8c3c8179d32774027d67cc441dbb016aa3556515bf88ee464c98c6f274189"
+  },
+  "production_changes_in_this_audit": false,
+  "system_end_to_end_verified": false,
+  "report_generated_at": {
+    "input-behavior-build11.json": "2026-10-10T13:44:49Z",
+    "client-behavior-build11.json": "2026-10-10T13:44:48Z"
+  },
+  "existing_controller_regression": "passed after extracting shared TextClient"
+}

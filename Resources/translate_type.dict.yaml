@@ -1,0 +1,9 @@
+---
+name: translate_type
+version: "0.3.0"
+sort: by_weight
+import_tables:
+  - pinyin_simp
+  - base
+  - mixed_english
+...

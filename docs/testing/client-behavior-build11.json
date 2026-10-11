@@ -1,0 +1,71 @@
+{
+  "cases" : [
+    {
+      "expected" : "保留光标后的 hao，不能只剩你",
+      "hasMarkedText" : false,
+      "id" : "CLIENT-CLICK",
+      "markedRange" : "{1, 0}",
+      "selection" : "{1, 0}",
+      "status" : "FAIL",
+      "steps" : "ni│hao → 输入区域鼠标按下",
+      "text" : "你"
+    },
+    {
+      "expected" : "保留光标后的 hao，不能只剩你",
+      "hasMarkedText" : false,
+      "id" : "CLIENT-DEACTIVATE",
+      "markedRange" : "{1, 0}",
+      "selection" : "{1, 0}",
+      "status" : "FAIL",
+      "steps" : "ni│hao → deactivateServer",
+      "text" : "你"
+    },
+    {
+      "expected" : "已选的你保留，只把 hao 原样确认",
+      "hasMarkedText" : false,
+      "id" : "CLIENT-PARTIAL-ENTER",
+      "markedRange" : "{5, 0}",
+      "selection" : "{5, 0}",
+      "status" : "FAIL",
+      "steps" : "ni│hao → Space → Enter",
+      "text" : "nihao"
+    },
+    {
+      "expected" : "光标在你和好之间时退格，剩下好",
+      "hasMarkedText" : true,
+      "id" : "CLIENT-DRAFT-EDIT",
+      "markedRange" : "{0, 1}",
+      "selection" : "{1, 0}",
+      "status" : "FAIL",
+      "steps" : "译英 → nihao → Space → ← → Backspace",
+      "text" : "你"
+    },
+    {
+      "expected" : "输入和光标保持不变",
+      "hasMarkedText" : true,
+      "id" : "CLIENT-BLOCK",
+      "markedRange" : "{0, 5}",
+      "selection" : "{2, 0}",
+      "status" : "PASS",
+      "steps" : "译英 → ni│hao → Ctrl+Enter",
+      "text" : "nihao"
+    },
+    {
+      "expected" : "记录已上屏中文和单独待确认句号的边界",
+      "hasMarkedText" : true,
+      "id" : "CLIENT-PUNCT",
+      "markedRange" : "{2, 1}",
+      "selection" : "{3, 0}",
+      "status" : "REVIEW",
+      "steps" : "译英 → nihao → Space → 鼠标按下 → .",
+      "text" : "你好。"
+    }
+  ],
+  "failed" : 4,
+  "generatedAt" : "2026-10-10T13:44:48Z",
+  "level" : "真实 IMK 控制器与 NSTextView，人工投递事件；非系统端到端",
+  "passed" : 1,
+  "realModelCalls" : 0,
+  "review" : 1,
+  "total" : 6
+}

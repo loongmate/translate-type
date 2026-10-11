@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方寸 · 随手用 AI</title>
+<link rel="stylesheet" href="assets/ai-actions.css">
+</head>
+<body>
+<header class="prototype-header">
+  <div><strong>方寸输入法</strong><span>随手用 AI · 交互设计</span></div>
+  <button class="quiet" id="guideButton"><i data-lucide="circle-help"></i>交互说明</button>
+</header>
+<main class="stage">
+  <section class="host-scene" aria-label="模拟的原输入框">
+    <div class="host-top"><span><i data-lucide="message-circle"></i>和朋友聊周末<span class="subtle">原输入框</span></span><span class="host-state" id="hostState">等待插入</span></div>
+    <div class="host-box"><textarea id="hostInput" aria-label="原输入框" spellcheck="false">我们周末去海边吧，</textarea><div class="host-bottom"><span>这里模拟原应用，插入内容不会发送消息。</span><button class="quiet" id="openHost"><i data-lucide="sparkles"></i>唤起方寸 <kbd>⌃ ⇧ ↵</kbd></button></div></div>
+    <div id="resume" class="resume" hidden><span><i data-lucide="check"></i><span id="resumeText">内容已插入，草稿仍保留</span></span><button class="secondary" id="resumeButton">继续用 AI</button><button class="quiet" id="undoInsert" hidden>撤销插入</button></div>
+  </section>
+
+  <section class="window" id="editor" aria-label="方寸 AI 编辑区">
+    <header class="window-title"><div class="window-identity"><i data-lucide="sparkles"></i><strong>方寸</strong><span>随手用 AI</span></div><div class="window-controls"><button class="icon" id="compactButton" title="缩回输入法浮窗" aria-label="缩回输入法浮窗"><i data-lucide="minimize-2"></i></button><button class="icon" id="wideButton" title="放大窗口" aria-label="放大窗口" aria-pressed="false"><i data-lucide="maximize"></i></button><button class="icon" id="hideButton" title="收起并保留内容" aria-label="收起并保留内容"><i data-lucide="x"></i></button></div></header>
+    <div class="toolbar">
+      <div class="segmented" role="tablist" aria-label="AI 用法"><button role="tab" aria-selected="true" aria-controls="workArea" id="transformTab"><i data-lucide="wand-sparkles"></i>改文字</button><button role="tab" aria-selected="false" aria-controls="workArea" id="askTab"><i data-lucide="message-circle"></i>问 AI</button></div>
+      <div class="action-wrap"><button id="actionButton" class="action-button" aria-expanded="false" aria-controls="actionPicker"><i data-lucide="languages"></i><span id="actionName">翻译成英语</span><i data-lucide="chevron-down"></i></button>
+        <div class="action-picker" id="actionPicker" hidden><div class="search-wrap"><i data-lucide="search"></i><input id="actionSearch" aria-label="搜索动作" placeholder="搜索动作或输入 /key" autocomplete="off"></div><div class="picker-label">选择一个动作，按需执行</div><div id="actionList"></div><button class="new-action" id="newAction"><i data-lucide="plus"></i>自定义动作<span>让 AI 按你的规则处理</span></button></div>
+      </div>
+      <span class="toolbar-hint" id="toolbarHint" hidden>想问就问，想写就写</span>
+      <button class="quiet manage" id="manageAction"><i data-lucide="sliders-horizontal"></i><span>自定义动作</span></button>
+    </div>
+
+    <div class="work-area" id="workArea" role="tabpanel" aria-labelledby="transformTab">
+      <section class="input-pane">
+        <div class="pane-heading"><div><h1 id="sourceTitle">想让 AI 帮你做什么？</h1><span id="sourceSubtitle">一句问题，也可以是一件具体的事。</span></div><button class="icon" id="clearSource" aria-label="清空输入" title="清空输入"><i data-lucide="eraser"></i></button></div>
+        <textarea id="source" aria-label="问题或原文" spellcheck="false"></textarea>
+        <div class="source-meta"><span id="sourceCount"></span><span>Enter 换行</span></div>
+        <details id="referenceDetails"><summary><i data-lucide="paperclip"></i>附上参考文字<span>可选</span></summary><textarea id="reference" aria-label="参考文字" placeholder="粘贴邮件、聊天或资料，AI 只参考你放进来的内容。" spellcheck="false"></textarea></details>
+        <div class="source-bottom"><button class="quiet" id="pasteSource"><i data-lucide="clipboard"></i>粘贴</button><button class="primary" id="run"><i data-lucide="sparkles"></i><span id="runLabel">问一下</span><kbd>⌃ ↵</kbd></button></div>
+      </section>
+
+      <section class="result-pane" aria-label="AI 结果">
+        <div class="pane-heading result-heading"><div class="result-title"><h2 id="resultTitle">AI 的回答</h2><span class="badge" id="resultBadge">演示示例</span></div><div class="result-tools"><select id="version" aria-label="查看回答版本" hidden></select><button class="quiet" id="copyResult"><i data-lucide="copy"></i><span id="copyLabel">复制</span></button></div></div>
+        <div class="result-body"><textarea id="result" aria-label="AI 结果，可修改或选择部分文字" spellcheck="false"></textarea><div class="empty-state" id="emptyState" hidden><i data-lucide="text-cursor-input"></i><strong id="emptyTitle">你的文字，还有别的可能</strong><p id="emptyDescription">选一个动作，结果会出现在这里。<br>你确认之前，原输入框保持原样。</p></div></div>
+        <div class="selection-bar" id="selectionBar"><span><i data-lucide="text-select"></i><span id="selectionHint">划选想用的部分，也可以直接修改回答</span></span><button id="clearSelection" class="quiet" hidden>取消选中</button></div>
+        <form id="followForm" class="follow-up"><input id="followInput" aria-label="继续追问" placeholder="接着问，或说说你想怎么改…" autocomplete="off"><button type="submit" class="icon" id="followButton" aria-label="发送追问" title="发送追问"><i data-lucide="arrow-up"></i></button></form>
+        <div class="follow-context" id="followContext"><span>追问沿用本次对话</span><button class="text-button" id="shorten">帮我缩成一句话</button></div>
+      </section>
+    </div>
+    <div class="status-line" id="status" role="status" aria-live="polite">当前动作：翻译成英语。主动执行后才会处理。</div>
+    <footer class="commit-bar"><div class="destination"><i data-lucide="corner-down-left"></i><div><strong>插入到：和朋友聊周末</strong><span id="destinationHint">保留原光标位置 · 不会发送消息</span></div></div><div class="commit-actions"><button class="secondary" id="insertSource" hidden>原文上屏 <kbd>⇧ ⌘ ↵</kbd></button><button class="primary commit" id="insertResult"><i data-lucide="corner-down-left"></i><span id="insertLabel">插入回答</span><kbd>⌘ ↵</kbd></button></div></footer>
+  </section>
+
+  <section class="compact" id="compact" aria-label="输入法 AI 入口" hidden>
+    <header><span>中</span><strong>方寸</strong><button class="quiet" id="expandButton"><i data-lucide="maximize-2"></i>展开编辑</button></header>
+    <textarea id="compactDraft" aria-label="输入法已选词草稿" spellcheck="false">周末去海边，怎么安排轻松一点？</textarea>
+    <div class="compact-actions"><button class="soft" id="compactAsk"><i data-lucide="message-circle"></i>问 AI</button><button class="soft" id="compactTransform"><i data-lucide="wand-sparkles"></i>改文字<i data-lucide="chevron-down"></i></button><span>选词完成后使用</span></div>
+    <footer>中文照常输入，AI 只在你需要时出现。<kbd>⌃ ⇧ ↵</kbd></footer>
+  </section>
+</main>
+<footer class="prototype-footer"><div><span>交互原型 · 示例结果，不调用模型</span><small>处理内容 → 挑选结果 → 回到原输入框</small></div><div class="demo-buttons"><button data-demo="english" class="demo active">默认译英</button><button data-demo="ask" class="demo">问 AI / 帮我写</button><button data-demo="german" class="demo">翻译成德语</button><button data-demo="extract" class="demo">提取信息</button><button data-demo="compact" class="demo">输入法入口</button></div></footer>
+<div class="toast" role="status" id="toast" hidden></div>
+
+<dialog id="actionDialog" aria-labelledby="dialogTitle"><form id="actionForm"><header><div><span class="eyebrow">我的动作</span><h2 id="dialogTitle">给 AI 一个固定的拿手活</h2></div><button type="button" class="icon" id="closeAction" aria-label="关闭自定义动作"><i data-lucide="x"></i></button></header><p class="dialog-intro">起个名字，告诉它怎么处理。以后选择这个动作就能用。</p><div class="form-row"><label>动作名称<input id="customName" maxlength="18" required placeholder="例如：提取约定"></label><label class="key-field">快捷名称 <span>可选</span><div class="key-input"><span>/</span><input id="customKey" maxlength="16" pattern="[a-zA-Z][a-zA-Z0-9_-]*" placeholder="yueding" title="字母开头，可用字母、数字、下划线和短横线"></div></label></div><label class="prompt-label">特殊指令 <span>留空使用默认规则</span><textarea id="customPrompt" rows="5" maxlength="4000" placeholder="例如：从输入文字中提取日期、时间、地点和需要带的东西。按清单输出，没提到的写“未提及”，不要猜测。"></textarea></label><div class="prompt-presets"><span>从一个例子开始</span><button type="button" data-preset="german">译成德语</button><button type="button" data-preset="extract">提取约定</button><button type="button" data-preset="polish">说得自然点</button></div><div class="prompt-note"><i data-lucide="info"></i><span>原文会自动附在指令后面。留空时，默认按原文中的要求处理；没有明确要求则保留原文。保存不会调用 AI。</span></div><div class="form-error" id="formError" role="alert"></div><footer><button type="button" class="quiet" id="cancelAction">取消</button><button type="submit" class="primary">保存并使用</button></footer></form></dialog>
+
+<dialog id="guideDialog" aria-labelledby="guideTitle"><header><h2 id="guideTitle">在打字的地方，顺手用 AI</h2><button class="icon" id="closeGuide" aria-label="关闭交互说明"><i data-lucide="x"></i></button></header><div class="guide-content"><p><strong>问 AI</strong>：问问题、写回复、整理计划。可以附参考文字、继续追问，也能回看之前的回答。</p><p><strong>改文字</strong>：把临时草稿交给一个动作。翻译、润色、提取，以及自己保存的指令，都走同一条流程。</p><p><strong>只拿需要的部分</strong>：在结果中划选文字，复制和插入就只取选中内容；取消选中后恢复全文。</p><dl><dt>⌃ ⇧ Enter</dt><dd>打开 / 收起编辑区</dd><dt>⌃ Enter</dt><dd>执行动作；在追问框中发送追问</dd><dt>⌘ Enter</dt><dd>插入选中结果，没有选区则插入全部结果</dd><dt>⇧ ⌘ Enter</dt><dd>改文字模式：原文上屏</dd><dt>Esc</dt><dd>关闭菜单，或收起浮窗并保留内容</dd></dl><p class="muted">本稿只演示文字处理。不会联网查询、操作其他应用或自动执行事务；正式接入这些能力时，需要明确的执行反馈。新增动作仅保存在本浏览器，草稿和问答刷新后清空。</p><p class="muted">内置样例返回固定演示结果。修改输入或使用自定义指令，会明确显示演示占位内容，不冒充实际 AI 输出。</p><div class="guide-debug"><span id="requestCount">本次演示调用：0</span><button class="secondary" id="failNext">模拟下次请求失败</button></div></div></dialog>
+<script src="assets/lucide.min.js"></script><script src="assets/ai-actions.js"></script>
+</body></html>

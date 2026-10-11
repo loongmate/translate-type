@@ -1,0 +1,1640 @@
+{
+  "cases" : [
+    {
+      "actual" : {
+        "candidates" : [
+          "你好",
+          "拟好",
+          "你",
+          "拟",
+          "尼"
+        ],
+        "caret" : 6,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "ni hao",
+        "raw" : "nihao",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：你好",
+      "id" : "Q01",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "nihao",
+      "target" : "你好",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "你说的",
+          "你说得",
+          "你说",
+          "你",
+          "拟"
+        ],
+        "caret" : 10,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "ni shuo de",
+        "raw" : "nishuode",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：你说的",
+      "id" : "Q02",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "nishuode",
+      "target" : "你说的",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "中文输入",
+          "中文输入法",
+          "中文",
+          "重文",
+          "中"
+        ],
+        "caret" : 16,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "zhong wen shu ru",
+        "raw" : "zhongwenshuru",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：中文输入",
+      "id" : "Q03",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "zhongwenshuru",
+      "target" : "中文输入",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "选词可能不正确",
+          "选词",
+          "选",
+          "玄",
+          "轩"
+        ],
+        "caret" : 28,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "xuan ci ke neng bu zheng que",
+        "raw" : "xuancikenengbuzhengque",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：选词可能不正确",
+      "id" : "Q04",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "xuancikenengbuzhengque",
+      "target" : "选词可能不正确",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "测试",
+          "侧视",
+          "侧室",
+          "策士",
+          "测"
+        ],
+        "caret" : 6,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "ce shi",
+        "raw" : "ceshi",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：测试",
+      "id" : "Q05",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "ceshi",
+      "target" : "测试",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "测试也要充分考虑易用性",
+          "测试",
+          "侧视",
+          "侧室",
+          "策士"
+        ],
+        "caret" : 43,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "ce shi ye yao chong fen kao lü yi yong xing",
+        "raw" : "ceshiyeyaochongfenkaolvyiyongxing",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：测试也要充分考虑易用性",
+      "id" : "Q06",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "ceshiyeyaochongfenkaolvyiyongxing",
+      "target" : "测试也要充分考虑易用性",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "我想去北京",
+          "我想去",
+          "我想",
+          "我向",
+          "我像"
+        ],
+        "caret" : 20,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "wo xiang qu bei jing",
+        "raw" : "woxiangqubeijing",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：我想去北京",
+      "id" : "Q07",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "woxiangqubeijing",
+      "target" : "我想去北京",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "今天下午三点开会",
+          "今天下午",
+          "今天",
+          "金田",
+          "浸提"
+        ],
+        "caret" : 32,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "jin tian xia wu san dian kai hui",
+        "raw" : "jintianxiawusandiankaihui",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：今天下午三点开会",
+      "id" : "Q08",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "jintianxiawusandiankaihui",
+      "target" : "今天下午三点开会",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "我们",
+          "women",
+          "我",
+          "喔",
+          "窝"
+        ],
+        "caret" : 6,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "wo men",
+        "raw" : "women",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：我们",
+      "id" : "Q09",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "women",
+      "target" : "我们",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "西安",
+          "西岸",
+          "锡安",
+          "系",
+          "西"
+        ],
+        "caret" : 5,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "xi'an",
+        "raw" : "xi'an",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：西安",
+      "id" : "Q10",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "xi'an",
+      "target" : "西安",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "长安",
+          "长按",
+          "长案",
+          "长",
+          "唱"
+        ],
+        "caret" : 8,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "chang'an",
+        "raw" : "chang'an",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：长安",
+      "id" : "Q11",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "chang'an",
+      "target" : "长安",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "重庆",
+          "虫情",
+          "冲",
+          "重",
+          "充"
+        ],
+        "caret" : 10,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "chong qing",
+        "raw" : "chongqing",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：重庆",
+      "id" : "Q12",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "chongqing",
+      "target" : "重庆",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "银行",
+          "引航",
+          "引吭",
+          "因",
+          "引"
+        ],
+        "caret" : 8,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "yin hang",
+        "raw" : "yinhang",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：银行",
+      "id" : "Q13",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "yinhang",
+      "target" : "银行",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "行业",
+          "行",
+          "航",
+          "杭",
+          "夯"
+        ],
+        "caret" : 7,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "hang ye",
+        "raw" : "hangye",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：行业",
+      "id" : "Q14",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "hangye",
+      "target" : "行业",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "方寸输入法",
+          "方寸",
+          "芳村",
+          "方村",
+          "房村"
+        ],
+        "caret" : 18,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "fang cun shu ru fa",
+        "raw" : "fangcunshurufa",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：方寸输入法",
+      "id" : "Q15",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "fangcunshurufa",
+      "target" : "方寸输入法",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "托盘里的logo",
+          "托盘",
+          "托",
+          "拖",
+          "脱"
+        ],
+        "caret" : 18,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "tuo pan li de logo",
+        "raw" : "tuopanlidelogo",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：托盘里的logo",
+      "id" : "Q16",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "tuopanlidelogo",
+      "target" : "托盘里的logo",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "支持API",
+          "支持",
+          "智齿",
+          "只吃",
+          "直尺"
+        ],
+        "caret" : 11,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "zhi chi API",
+        "raw" : "zhichiAPI",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：支持API",
+      "id" : "Q17",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "zhichiAPI",
+      "target" : "支持API",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "我要修改Bug",
+          "我要",
+          "窝腰",
+          "我呀",
+          "我"
+        ],
+        "caret" : 18,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "wo yao xiu gai Bug",
+        "raw" : "woyaoxiugaiBug",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：我要修改Bug",
+      "id" : "Q18",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "woyaoxiugaiBug",
+      "target" : "我要修改Bug",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "我再跟it湖北提交了譬如",
+          "我再跟",
+          "我在",
+          "我再",
+          "握在"
+        ],
+        "caret" : 31,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "wo zai G it Hu b ti jiao le P R",
+        "raw" : "wozaiGitHubtijiaolePR",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：我在GitHub提交了PR",
+      "id" : "Q19",
+      "qualitySample" : true,
+      "rankInFirstPage" : 0,
+      "status" : "REVIEW",
+      "steps" : "wozaiGitHubtijiaolePR",
+      "target" : "我在GitHub提交了PR",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "这个App很好",
+          "这个",
+          "这歌",
+          "这",
+          "着"
+        ],
+        "caret" : 18,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "zhe ge App hen hao",
+        "raw" : "zhegeApphenhao",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：这个App很好",
+      "id" : "Q20",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "zhegeApphenhao",
+      "target" : "这个App很好",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "女孩",
+          "女",
+          "钕",
+          "籹",
+          "釹"
+        ],
+        "caret" : 6,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "nü hai",
+        "raw" : "nvhai",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：女孩",
+      "id" : "Q21",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "nvhai",
+      "target" : "女孩",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "绿色",
+          "滤色",
+          "率",
+          "绿",
+          "吕"
+        ],
+        "caret" : 5,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "lü se",
+        "raw" : "lvse",
+        "translationAllowed" : false
+      },
+      "expected" : "目标表达：绿色",
+      "id" : "Q22",
+      "qualitySample" : true,
+      "rankInFirstPage" : 1,
+      "status" : "PASS",
+      "steps" : "lvse",
+      "target" : "绿色",
+      "title" : "首选词样本"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "好",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "好",
+      "id" : "SEL-C-1",
+      "status" : "PASS",
+      "steps" : "hao → 数字 1",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "号",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "号",
+      "id" : "SEL-C-2",
+      "status" : "PASS",
+      "steps" : "hao → 数字 2",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "浩",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "浩",
+      "id" : "SEL-C-3",
+      "status" : "PASS",
+      "steps" : "hao → 数字 3",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "豪",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "豪",
+      "id" : "SEL-C-4",
+      "status" : "PASS",
+      "steps" : "hao → 数字 4",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "耗",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "耗",
+      "id" : "SEL-C-5",
+      "status" : "PASS",
+      "steps" : "hao → 数字 5",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "豪",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "豪",
+      "id" : "SPACE-C",
+      "status" : "PASS",
+      "steps" : "hao → ↓ → Space",
+      "title" : "空格确认当前高亮而非固定第一项"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "昊",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "昊",
+      "id" : "PAGE-C",
+      "status" : "PASS",
+      "steps" : "hao → PageDown → 2",
+      "title" : "翻页后数字对应当前页"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "耗",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "耗",
+      "id" : "CHOOSE-C",
+      "status" : "PASS",
+      "steps" : "hao → choose(2)",
+      "title" : "候选按钮的选择接口"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你耗",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "你耗",
+      "id" : "PARTIAL-C",
+      "status" : "PASS",
+      "steps" : "nihao → ←×3 → Space → Space",
+      "title" : "分两次选词保留整句"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "耗",
+          "豪",
+          "昊",
+          "浩",
+          "号"
+        ],
+        "caret" : 3,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "hao",
+        "raw" : "hao",
+        "translationAllowed" : false
+      },
+      "expected" : "保留 hao，不确认其他候选",
+      "id" : "INVALID-C",
+      "status" : "PASS",
+      "steps" : "hao → 9",
+      "title" : "不存在的候选序号不破坏输入"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你耗。",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "你耗。",
+      "id" : "PUNCT-C",
+      "status" : "PASS",
+      "steps" : "nihao → Space → .",
+      "title" : "句号跟随已选中文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "豪，",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "豪，",
+      "id" : "PUNCT-SELECT-C",
+      "status" : "PASS",
+      "steps" : "hao → ↓ → ,",
+      "title" : "候选高亮后标点确认的词一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "logo",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "logo",
+      "id" : "RAW-C",
+      "status" : "PASS",
+      "steps" : "logo → Enter",
+      "title" : "未选择的英文原样确认"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "nihao",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "你hao",
+      "id" : "PARTIAL-RAW-C",
+      "status" : "FAIL",
+      "steps" : "nihao → ←×3 → Space（你）→ Enter",
+      "title" : "原样确认不能把已选中文还原成拼音"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "nihao",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "你hao",
+      "id" : "PARTIAL-SHIFT-C",
+      "status" : "FAIL",
+      "steps" : "nihao → ←×3 → Space（你）→ 切英文",
+      "title" : "切英文不能撤销已确认的中文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "完整保留 nihao / 你hao / 你耗",
+      "id" : "FLUSH-C",
+      "status" : "FAIL",
+      "steps" : "ni│hao → flushOriginal（失焦路径）",
+      "title" : "结束会话不能丢失光标后的输入"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "豪",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "豪",
+      "id" : "SEL-T-1",
+      "status" : "PASS",
+      "steps" : "hao → 数字 1",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "耗",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "耗",
+      "id" : "SEL-T-2",
+      "status" : "PASS",
+      "steps" : "hao → 数字 2",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "昊",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "昊",
+      "id" : "SEL-T-3",
+      "status" : "PASS",
+      "steps" : "hao → 数字 3",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "浩",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "浩",
+      "id" : "SEL-T-4",
+      "status" : "PASS",
+      "steps" : "hao → 数字 4",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "号",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "号",
+      "id" : "SEL-T-5",
+      "status" : "PASS",
+      "steps" : "hao → 数字 5",
+      "title" : "数字选择与所显示的候选一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "耗",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "耗",
+      "id" : "SPACE-T",
+      "status" : "PASS",
+      "steps" : "hao → ↓ → Space",
+      "title" : "空格确认当前高亮而非固定第一项"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "郝",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "郝",
+      "id" : "PAGE-T",
+      "status" : "PASS",
+      "steps" : "hao → PageDown → 2",
+      "title" : "翻页后数字对应当前页"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "昊",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "昊",
+      "id" : "CHOOSE-T",
+      "status" : "PASS",
+      "steps" : "hao → choose(2)",
+      "title" : "候选按钮的选择接口"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 2,
+        "draft" : "你耗",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你耗",
+      "id" : "PARTIAL-T",
+      "status" : "PASS",
+      "steps" : "nihao → ←×3 → Space → Space",
+      "title" : "分两次选词保留整句"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "耗",
+          "豪",
+          "昊",
+          "号",
+          "浩"
+        ],
+        "caret" : 3,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "hao",
+        "raw" : "hao",
+        "translationAllowed" : false
+      },
+      "expected" : "保留 hao，不确认其他候选",
+      "id" : "INVALID-T",
+      "status" : "PASS",
+      "steps" : "hao → 9",
+      "title" : "不存在的候选序号不破坏输入"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 3,
+        "draft" : "你耗。",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你耗。",
+      "id" : "PUNCT-T",
+      "status" : "PASS",
+      "steps" : "nihao → Space → .",
+      "title" : "句号跟随已选中文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 2,
+        "draft" : "豪，",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "豪，",
+      "id" : "PUNCT-SELECT-T",
+      "status" : "PASS",
+      "steps" : "hao → ↓ → ,",
+      "title" : "候选高亮后标点确认的词一致"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 4,
+        "draft" : "logo",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "logo",
+      "id" : "RAW-T",
+      "status" : "PASS",
+      "steps" : "logo → Enter",
+      "title" : "未选择的英文原样确认"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 5,
+        "draft" : "nihao",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你hao",
+      "id" : "PARTIAL-RAW-T",
+      "status" : "FAIL",
+      "steps" : "nihao → ←×3 → Space（你）→ Enter",
+      "title" : "原样确认不能把已选中文还原成拼音"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 5,
+        "draft" : "nihao",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你hao",
+      "id" : "PARTIAL-SHIFT-T",
+      "status" : "FAIL",
+      "steps" : "nihao → ←×3 → Space（你）→ 切英文",
+      "title" : "切英文不能撤销已确认的中文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "完整保留 nihao / 你hao / 你耗",
+      "id" : "FLUSH-T",
+      "status" : "FAIL",
+      "steps" : "ni│hao → flushOriginal（失焦路径）",
+      "title" : "结束会话不能丢失光标后的输入"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : " ",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "一个空格",
+      "id" : "EMPTY-SPACE",
+      "status" : "PASS",
+      "steps" : "Space",
+      "title" : "空输入时空格交给宿主"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "3.14",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "需确定整段英文识别规则；不得当作中文正确率通过项",
+      "id" : "DECIMAL-C",
+      "status" : "REVIEW",
+      "steps" : "3.14",
+      "title" : "中文模式的结构化英文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "3.14",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "3.14",
+      "id" : "DECIMAL-EN",
+      "status" : "PASS",
+      "steps" : "3.14",
+      "title" : "英文模式保留符号"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "com"
+        ],
+        "caret" : 3,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "test@example。",
+        "page" : 0,
+        "preedit" : "com",
+        "raw" : "com",
+        "translationAllowed" : false
+      },
+      "expected" : "需确定整段英文识别规则；不得当作中文正确率通过项",
+      "id" : "EMAIL-C",
+      "status" : "REVIEW",
+      "steps" : "test@example.com",
+      "title" : "中文模式的结构化英文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "test@example.com",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "test@example.com",
+      "id" : "EMAIL-EN",
+      "status" : "PASS",
+      "steps" : "test@example.com",
+      "title" : "英文模式保留符号"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "HTTPS：//example。com/啊？下=1",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "需确定整段英文识别规则；不得当作中文正确率通过项",
+      "id" : "URL-C",
+      "status" : "REVIEW",
+      "steps" : "https://example.com/a?x=1",
+      "title" : "中文模式的结构化英文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "https://example.com/a?x=1",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "https://example.com/a?x=1",
+      "id" : "URL-EN",
+      "status" : "PASS",
+      "steps" : "https://example.com/a?x=1",
+      "title" : "英文模式保留符号"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "API_vacancies",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "需确定整段英文识别规则；不得当作中文正确率通过项",
+      "id" : "CODE-C",
+      "status" : "REVIEW",
+      "steps" : "API_v2",
+      "title" : "中文模式的结构化英文"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "API_v2",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "API_v2",
+      "id" : "CODE-EN",
+      "status" : "PASS",
+      "steps" : "API_v2",
+      "title" : "英文模式保留符号"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "。",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "展示实际状态，是否允许仅标点翻译需决定",
+      "id" : "LONE-PUNCT",
+      "status" : "REVIEW",
+      "steps" : "开启译英 → .",
+      "title" : "截图对应的仅标点草稿"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 2,
+        "draft" : "你耗",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "光标从你好末尾左移一字，不上屏",
+      "id" : "DRAFT-LEFT",
+      "status" : "FAIL",
+      "steps" : "译英 → nihao → Space → ←",
+      "title" : "已选中文草稿需要能移动光标纠错"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 1,
+        "draft" : "你",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你",
+      "id" : "DRAFT-BACKSPACE",
+      "status" : "PASS",
+      "steps" : "译英 → nihao → Space → Backspace",
+      "title" : "草稿末尾退格只删一个字"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 3,
+        "draft" : "你耗 ",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "你耗 后有一个空格",
+      "id" : "DRAFT-SPACE",
+      "status" : "PASS",
+      "steps" : "译英 → nihao → Space → Space",
+      "title" : "无候选时空格进入草稿"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "当前实现会清空整段；需要决定分层取消规则",
+      "id" : "DRAFT-ESC",
+      "status" : "REVIEW",
+      "steps" : "译英 → nihao → Space → shijie → Esc",
+      "title" : "取消当前拼音是否同时丢弃已选草稿"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "完整保留 nihao / 你hao / 你耗",
+      "id" : "TAB-TAIL",
+      "status" : "FAIL",
+      "steps" : "译英 → ni│hao → Tab",
+      "title" : "Tab 离开输入时保留未选尾部"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "完整保留 nihao / 你hao / 你耗",
+      "id" : "TOGGLE-TAIL",
+      "status" : "FAIL",
+      "steps" : "译英 → ni│hao → 关闭译英",
+      "title" : "关闭译英不能丢掉待选尾部"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+          "你",
+          "拟",
+          "尼",
+          "呢",
+          "泥"
+        ],
+        "caret" : 4,
+        "draft" : "你耗",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "nihao",
+        "raw" : "nihao",
+        "translationAllowed" : false
+      },
+      "expected" : "全文与光标保持不变，不启动翻译",
+      "id" : "BLOCK-TRANSLATION",
+      "status" : "PASS",
+      "steps" : "你好 + ni│hao → Ctrl+Enter",
+      "title" : "未选完不能翻译或改动草稿"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 0,
+        "draft" : "",
+        "highlighted" : 0,
+        "output" : "你耗",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : false
+      },
+      "expected" : "当前 Enter 中文上屏；段内换行操作待设计",
+      "id" : "DRAFT-RETURN",
+      "status" : "REVIEW",
+      "steps" : "译英 → nihao → Space → Enter",
+      "title" : "中文草稿的换行与中文上屏冲突"
+    },
+    {
+      "actual" : {
+        "candidates" : [
+
+        ],
+        "caret" : 180,
+        "draft" : "你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。你耗。",
+        "highlighted" : 0,
+        "output" : "",
+        "page" : 0,
+        "preedit" : "",
+        "raw" : "",
+        "translationAllowed" : true
+      },
+      "expected" : "60 次实际高亮的选词与句号完整保留",
+      "id" : "LONG-DRAFT",
+      "status" : "PASS",
+      "steps" : "重复 60 次 nihao → Space → .",
+      "title" : "连续长草稿不提前上屏"
+    }
+  ],
+  "failed" : 9,
+  "generatedAt" : "2026-10-10T13:44:49Z",
+  "isolatedUserDictionary" : true,
+  "level" : "真实 Rime 与 CompositionSession，非系统端到端测试",
+  "passed" : 56,
+  "personalSettingsRead" : false,
+  "rankingCorpusBeforeSelections" : true,
+  "realModelCalls" : 0,
+  "review" : 8,
+  "total" : 73
+}
