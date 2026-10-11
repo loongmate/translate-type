@@ -1,13 +1,13 @@
 # 方寸输入法发布方案
 
-调查日期：2026-10-11。建议第一版通过 GitHub Releases 发布 macOS 安装包，版本标为 `0.1.0-beta.1`，先进行小范围测试，再开放正式下载。
+调查日期：2026-10-11。第一版通过 GitHub Releases 分别提供 **Apple Silicon 版（M 系列芯片）** 和 **Intel 版**，版本标为 `0.1.0-beta.1`，先进行小范围测试，再开放正式下载。
 
 ## 当前具备什么
 
 - 源码、原型、测试和说明已推送至 `loongmate/translate-type` 的 `main` 分支。
 - 产品版本为 `0.1.0`，应用 build 为 `22`。已有功能回归 489 项通过，真实宿主上屏也已经过用户确认。
 - 构建脚本支持 `x86_64 arm64` 双架构，Rime 官方动态库本身已包含两种架构。最低系统版本从 `Info.plist` 读取，传递给 C 和 Swift 编译器，避免声明 macOS 13、实际却默认编译到 macOS 14。
-- 预览打包脚本会验证签名完整性、检查两种架构、生成 ZIP 与 SHA-256；不安装、不上传、不公证。
+- 双架构应用仅作为构建中间产物。预览打包脚本分别提取 `arm64` 与 `x86_64`，应用主程序和 Rime 库都裁剪为对应的单一架构，重新签名、验证，生成两个 ZIP 和各自的 SHA-256；不安装、不上传、不公证。
 - 本机没有可用的代码签名证书。现有签名为 ad hoc 开发签名，不是 Developer ID。
 
 ```sh
@@ -16,13 +16,20 @@ FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh
 ./scripts/package-preview.sh
 ```
 
-输出：`dist/FangCun-0.1.0-build22-universal-preview.zip`，包含应用与安装说明。它是本地打包预览，**尚非可正式分发的安装器**。构建和 ZIP 校验通过不等于新机器安装通过，Apple Silicon 和 macOS 13 还需实机验收。
+输出如下，每个 ZIP 包含对应架构的应用与安装说明：
 
-本轮实际生成 ZIP 为 10,698,566 字节。已检查压缩包 CRC、解压后的完整签名、两个架构、两份主程序的 macOS 13.0 最低版本、动态库路径、包内资源与源码目录对应关系，以及解压前后可执行文件一致性。SHA-256：`23bba43d1001ac74439b5c9711fc661abf7f1f0792fafd30cf69042b668b37dd`。重新打包的 ZIP 可能因时间戳不同而改变摘要，应以同次生成的 `.sha256` 为准。
+| 下载版本 | 架构 | 本轮大小 | 本地文件 |
+| --- | --- | --- | --- |
+| Apple Silicon 版 · M 系列 | arm64 | 9,075,401 字节 | `dist/FangCun-0.1.0-build22-AppleSilicon-preview.zip` |
+| Intel 版 | x86_64 | 9,207,916 字节 | `dist/FangCun-0.1.0-build22-Intel-preview.zip` |
+
+单架构应用同时保留在 `build/releases/AppleSilicon/FangCun.app` 和 `build/releases/Intel/FangCun.app`，供之后分别正式签名、打包。旧通用预览包移至 `.build/retired-distributions/`，下载目录只提供本版本的两种芯片包。
+
+这些是本地打包预览，**尚非可正式分发的安装器**。构建和 ZIP 校验通过不等于新机器安装通过，Apple Silicon 和 macOS 13 还需实机验收。本轮两份包均通过压缩包 CRC、解压签名、主程序及动态库单一架构、最低系统版本、可执行权限、文件一致性和 SHA-256 校验；重新打包可能因时间戳不同改变摘要，以同次生成的 `.sha256` 为准。
 
 ## 给普通用户的安装体验
 
-推荐最终下载物为签名、公证的 `.pkg`，必要时装入 `.dmg`。下载页提供版本、系统要求、文件大小、SHA-256、更新说明和模型配置说明。用户不需要安装 Xcode、Python、Homebrew 或克隆代码。
+推荐最终下载物为分别签名、公证的 `FangCun-0.1.0-beta.1-AppleSilicon.pkg` 和 `FangCun-0.1.0-beta.1-Intel.pkg`，必要时分别装入 `.dmg`。下载页显示“Apple Silicon 版（M 系列）”和“Intel 版”两个按钮，并提供版本、系统要求、文件大小、SHA-256、更新说明和模型配置说明。用户不需要安装 Xcode、Python、Homebrew 或克隆代码。用户可通过苹果菜单 → 关于本机查看芯片或处理器型号；安装器也需拒绝不匹配的架构并提示下载正确版本。
 
 正式安装器还需要实施，目标流程如下：
 
@@ -49,32 +56,35 @@ FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh
 
 证书私钥留在钥匙串，公证凭据不写进仓库。仅下载 `.cer`、却没有对应私钥，不能完成签名。Apple 对应用与安装包签名的要求见 [Developer ID](https://developer.apple.com/developer-id/) 和 [证书说明](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)。
 
-以下为拿到证书后的应用 ZIP 签名、公证流程示例，尚未在本机执行。正式 `.pkg` 还需单独签名、公证及验证。
+以下为拿到证书后，对两份单架构应用分别签名、公证的 ZIP 流程示例，尚未在本机执行。最终两份 `.pkg` 也需各自签名、公证及验证。
 
 ```sh
-# 在发布副本上操作，避免改变当前已经安装的应用。
-mkdir -p dist/signing
-ditto build/FangCun.app dist/signing/FangCun.app
-
+set -e
 # 替换成钥匙串中的真实证书名。
 FANGCUN_SIGN_ID='Developer ID Application: Your Name (TEAMID)'
-codesign --force --options runtime --timestamp --sign "$FANGCUN_SIGN_ID" \
-  dist/signing/FangCun.app/Contents/Frameworks/librime.1.dylib
-codesign --force --options runtime --timestamp --sign "$FANGCUN_SIGN_ID" \
-  dist/signing/FangCun.app
-codesign --verify --deep --strict --verbose=2 dist/signing/FangCun.app
-
 # 交互输入凭据并保存到钥匙串，不把密码放入脚本或聊天。
 xcrun notarytool store-credentials FangCun-notary
-ditto -c -k --keepParent dist/signing/FangCun.app dist/FangCun-notary.zip
-xcrun notarytool submit dist/FangCun-notary.zip \
-  --keychain-profile FangCun-notary --wait
-
-# 只有状态 Accepted 才继续；失败时读取该次 submission 的 notarytool log。
-xcrun stapler staple dist/signing/FangCun.app
-xcrun stapler validate dist/signing/FangCun.app
-spctl --assess --type execute --verbose=4 dist/signing/FangCun.app
-ditto -c -k --keepParent dist/signing/FangCun.app dist/FangCun-notarized.zip
+# 在发布副本上操作。两种架构分别处理，不再从通用应用生成下载包。
+for FANGCUN_CHIP in AppleSilicon Intel; do
+  mkdir -p "dist/signing/$FANGCUN_CHIP"
+  FANGCUN_APP="dist/signing/$FANGCUN_CHIP/FangCun.app"
+  ditto "build/releases/$FANGCUN_CHIP/FangCun.app" "$FANGCUN_APP"
+  codesign --force --options runtime --timestamp --sign "$FANGCUN_SIGN_ID" \
+    "$FANGCUN_APP/Contents/Frameworks/librime.1.dylib"
+  codesign --force --options runtime --timestamp --sign "$FANGCUN_SIGN_ID" "$FANGCUN_APP"
+  codesign --verify --deep --strict --verbose=2 "$FANGCUN_APP"
+  ditto -c -k --keepParent "$FANGCUN_APP" "dist/FangCun-$FANGCUN_CHIP-notary.zip"
+  xcrun notarytool submit "dist/FangCun-$FANGCUN_CHIP-notary.zip" \
+    --keychain-profile FangCun-notary --wait --output-format json \
+    > "dist/signing/$FANGCUN_CHIP/notary-result.json"
+  # 只有状态 Accepted 才继续；失败时停止并读取本次 notarytool log。
+  python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("status") == "Accepted" else 1)' \
+    "dist/signing/$FANGCUN_CHIP/notary-result.json"
+  xcrun stapler staple "$FANGCUN_APP"
+  xcrun stapler validate "$FANGCUN_APP"
+  spctl --assess --type execute --verbose=4 "$FANGCUN_APP"
+  ditto -c -k --keepParent "$FANGCUN_APP" "dist/FangCun-$FANGCUN_CHIP-notarized.zip"
+done
 ```
 
 启用 Hardened Runtime 后需要重新验证输入会话、候选窗、临时编辑区、钥匙串访问和宿主上屏。动态库先签、外层应用后签；不要用 `codesign --deep` 代替逐层签名。以上 `--deep` 只用于验证。公证不会代替产品测试。依据：[Apple 自定义公证流程](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[常见公证问题](https://developer.apple.com/documentation/security/resolving-common-notarization-issues)。
@@ -90,6 +100,6 @@ ditto -c -k --keepParent dist/signing/FangCun.app dist/FangCun-notarized.zip
 
 ## 发版操作
 
-完成上述准备后，将确认过的代码标记 `v0.1.0-beta.1`，创建 GitHub Release 草稿，附签名公证的安装包、SHA-256、更新说明和对应源码/第三方许可材料。先确认草稿中的文件与实际验证过的文件摘要一致，再发布供下载。自动更新可在后续版本加入；首版通过新安装包升级。
+完成上述准备后，将确认过的代码标记 `v0.1.0-beta.1`，创建一个 GitHub Release 草稿，同时附上 Apple Silicon、Intel 两份签名公证的安装包，以及各自 SHA-256、更新说明和对应源码/第三方许可材料。两份包保持相同产品版本与 build。先确认草稿中的文件与实际验证过的文件摘要一致，再发布供下载。自动更新可在后续版本加入，更新时也必须按本机架构选择；首版通过新安装包升级。
 
-本轮只推送代码、准备通用构建和本地预览包，没有创建 Release、推送版本标签或更改仓库可见性。
+本轮只推送代码、准备两种芯片的本地预览包，没有创建 Release、推送版本标签或更改仓库可见性。

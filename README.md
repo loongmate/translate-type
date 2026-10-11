@@ -119,6 +119,6 @@ Rime 1.17.0 从官方 release 下载，校验 SHA-256；其许可证随应用资
 
 ## 发布准备
 
-通用构建：`FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh`，同时生成 Intel 与 Apple Silicon 架构。随后运行 `./scripts/package-preview.sh` 可生成带安装说明和 SHA-256 的本地预览 ZIP。预览包尚未正式签名、公证，Apple Silicon 仍需实机验收。
+先编译两种架构：`FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh`，随后运行 `./scripts/package-preview.sh`，分别生成 **Apple Silicon 版（M 系列，arm64）** 和 **Intel 版（x86_64）** 两个预览 ZIP，各自带安装说明和 SHA-256。每个包的应用与 Rime 引擎均只保留对应架构。预览包尚未正式签名、公证，Apple Silicon 仍需实机验收。
 
 安装器、Developer ID、公证、升级和首次发版步骤见 [发布方案](docs/distribution.md)。
