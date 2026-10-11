@@ -1,9 +1,9 @@
 import AppKit
 import CoreText
 
-func glyph(in target:CGRect)->CGPath {
+func glyph(_ text:String = "方",in target:CGRect)->CGPath {
     let font = CTFontCreateWithName("PingFangSC-Semibold" as CFString,100,nil)
-    var character = Array("方".utf16)[0], value:CGGlyph = 0
+    var character = Array(text.utf16)[0], value:CGGlyph = 0
     precondition(CTFontGetGlyphsForCharacters(font,&character,&value,1))
     let path = CTFontCreatePathForGlyph(font,value,nil)!
     let box = path.boundingBoxOfPath
@@ -11,10 +11,10 @@ func glyph(in target:CGRect)->CGPath {
     var transform = CGAffineTransform(a:scale,b:0,c:0,d:scale,tx:target.midX-box.midX*scale,ty:target.midY-box.midY*scale)
     return path.copy(using:&transform)!
 }
-func menu(_ context:CGContext) {
+func menu(_ context:CGContext,letter:String = "方") {
     let path = CGMutablePath()
     path.addRoundedRect(in:CGRect(x:0,y:0,width:16,height:16),cornerWidth:3,cornerHeight:3)
-    path.addPath(glyph(in:CGRect(x:2.4,y:2.1,width:11.2,height:11.8)))
+    path.addPath(glyph(letter,in:CGRect(x:2.4,y:2.1,width:11.2,height:11.8)))
     context.setFillColor(CGColor(gray:0,alpha:1))
     context.addPath(path); context.drawPath(using:.eoFill)
 }
@@ -28,7 +28,13 @@ func bitmap(_ pixels:Int,logicalSize:CGFloat,draw:(CGContext)->Void)->NSBitmapIm
 }
 let root = URL(fileURLWithPath:FileManager.default.currentDirectoryPath)
 let resources = root.appendingPathComponent("Resources")
-let menuBitmap = bitmap(32,logicalSize:16,draw:menu)
+var englishMedia = CGRect(x:0,y:0,width:16,height:16)
+let englishPDF = CGContext(resources.appendingPathComponent("InputMenuEnglish-v1.pdf") as CFURL,mediaBox:&englishMedia,nil)!
+englishPDF.beginPDFPage(nil); menu(englishPDF,letter:"英"); englishPDF.endPDFPage(); englishPDF.closePDF()
+let englishBitmap = bitmap(64,logicalSize:16) { menu($0,letter:"英") }
+try englishBitmap.representation(using:.png,properties:[:])!.write(to:root.appendingPathComponent(".build/english-menu-icon-preview.png"))
+if CommandLine.arguments.contains("--english-menu-only") { exit(0) }
+let menuBitmap = bitmap(32,logicalSize:16) { menu($0) }
 try menuBitmap.representation(using:.tiff,properties:[:])!.write(to:resources.appendingPathComponent("InputMenuIcon.tiff"))
 try menuBitmap.representation(using:.png,properties:[:])!.write(to:root.appendingPathComponent(".build/menu-icon-preview.png"))
 var media = CGRect(x:0,y:0,width:16,height:16)

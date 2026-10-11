@@ -41,8 +41,16 @@ import Carbon
         check("你说的","控制器默认中文：拼音加空格在 NSTextView 中文上屏")
         shift(true); shift(false); type("logo")
         check("你说的logo","轻按 Shift 后英文直输")
+        precondition(client.selectedModes.last == InputSourceStatus.englishModeID)
+        print("PASS: Shift 切英文同步选择英字图标的原生模式")
         shift(true); shift(false); type("nihao"); key(" ",49)
         check("你说的logo你好","再次轻按 Shift 恢复中文候选与上屏")
+        precondition(client.selectedModes.last == InputSourceStatus.modeID)
+        print("PASS: Shift 切回中文同步恢复方字图标的原生模式")
+        let nativeSelections = client.selectedModes.count
+        controller.setValue(InputSourceStatus.modeID,forTag:Int(kTextServiceInputModePropertyTag),client:client)
+        precondition(client.selectedModes.count == nativeSelections)
+        print("PASS: 系统输入模式回调不递归切换模式")
         shift(true); key("A",0,flags:[.shift]); shift(false); key("\r",36)
         check("你说的logo你好A","Shift 配合字母保留大写，不切换输入语言")
         type("zhongwen"); key(" ",49)
@@ -63,6 +71,13 @@ import Carbon
         key("e",14,flags:[.control,.shift])
         type("nihao"); key(" ",49)
         precondition(client.text.hasMarkedText() && client.text.string.hasSuffix("你好"),"译英开启时保留中文草稿")
+        let draftBeforeModeSwitch = client.text.string
+        for mode in [InputSourceStatus.englishModeID,InputSourceStatus.modeID] {
+            shift(true); shift(false)
+            controller.setValue(mode,forTag:Int(kTextServiceInputModePropertyTag),client:client)
+            precondition(client.selectedModes.last == mode && client.text.string == draftBeforeModeSwitch && client.text.hasMarkedText())
+            print("PASS: 切换原生图标模式并收到系统回调后保留中文草稿：",mode)
+        }
         key("\r",36)
         check("你说的logo你好A中文你好你好托盘里的logo你好","译英草稿可确认中文上屏，全程没有翻译请求")
         key("e",14,flags:[.control,.shift])
@@ -209,6 +224,28 @@ import Carbon
             try SettingsWindow.shared.capture(to:URL(fileURLWithPath:path+"-translation.png"))
             window.close()
         }
+        // macOS can supply its mode before activating a new controller.
+        let earlyClient = TextClient()
+        let earlyController = TTInputController(server:server,delegate:nil,client:earlyClient)!
+        ConfigurationStore.shared.translateEnabled = false
+        earlyController.setValue(InputSourceStatus.englishModeID,forTag:Int(kTextServiceInputModePropertyTag),client:earlyClient)
+        earlyController.activateServer(earlyClient)
+        func earlyType(_ input:String) {
+            for c in input {
+                let e = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:ProcessInfo.processInfo.systemUptime,windowNumber:0,context:nil,characters:String(c),charactersIgnoringModifiers:String(c),isARepeat:false,keyCode:c == " " ? 49 : 0)!
+                _ = earlyController.handle(e,client:earlyClient)
+            }
+        }
+        earlyType("logo")
+        precondition(earlyClient.text.string == "logo" && !earlyClient.text.hasMarkedText())
+        print("PASS: 激活前收到英文模式时，实际输入也为英文")
+        ConfigurationStore.shared.pinyinLayout = .sogou
+        NotificationCenter.default.post(name:.pinyinLayoutChanged,object:nil)
+        earlyController.setValue(InputSourceStatus.modeID,forTag:Int(kTextServiceInputModePropertyTag),client:earlyClient)
+        earlyType("nihk ")
+        precondition(earlyClient.text.string == "logo你好" && !earlyClient.text.hasMarkedText())
+        print("PASS: 激活前已创建会话仍能响应拼音方案变化")
+        earlyController.deactivateServer(earlyClient)
         print("ALL CONTROLLER TESTS PASSED")
     }
 }

@@ -58,7 +58,7 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     private func updateInputStatus() {
         guard !isEnablingInput else { return }
         let available = InputSourceStatus.isAvailable
-        inputStatus.stringValue = available ? (InputSourceStatus.currentID == InputSourceStatus.modeID ? "正在使用方寸输入法。" : "方寸输入法已添加。在系统输入菜单中选择「方寸输入法」即可使用。") : "方寸输入法尚未添加。点击下方按钮添加到系统输入法。"
+        inputStatus.stringValue = available ? (InputSourceStatus.isOurMode(InputSourceStatus.currentID) ? "正在使用方寸输入法。" : "方寸输入法已添加。在系统输入菜单中选择「方寸输入法」即可使用。") : "方寸输入法尚未添加。点击下方按钮添加到系统输入法。"
         addButton.title = available ? "已添加到系统输入法" : "添加到系统输入法"
         addButton.isEnabled = !available
     }

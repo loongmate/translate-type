@@ -13,6 +13,10 @@ ditto "$SOURCE" "$STAGING"
 # Keep the identity and installed path that macOS already knows. Moving the
 # brand to another bundle ID creates a second IME, not a renamed installation.
 PREVIOUS_SOURCE=$(./scripts/input-sources.sh prepare-update)
+RESTORE_SOURCE="$PREVIOUS_SOURCE"
+if [ "$RESTORE_SOURCE" = 'com.translatetype.inputmethod.TranslateType.English' ]; then
+    RESTORE_SOURCE='com.translatetype.inputmethod.TranslateType.Hans'
+fi
 PIDS=$(pgrep -f '^/Users/.*/Library/Input Methods/(方寸输入法|FangCun|TranslateType).app/Contents/MacOS/TranslateType' || true)
 if [ -n "$PIDS" ]; then while read -r PID; do kill "$PID"; done <<< "$PIDS"; fi
 "$LSREGISTER" -u "$SOURCE" || true
@@ -27,7 +31,7 @@ if ! ./scripts/input-sources.sh enable "$DESTINATION" "$PREVIOUS_SOURCE"; then
         mv "$BACKUP" "$DESTINATION"
         "$LSREGISTER" -f "$DESTINATION"
         ./scripts/input-sources.sh register "$DESTINATION" || true
-        ./scripts/input-sources.sh select "$PREVIOUS_SOURCE" || true
+        ./scripts/input-sources.sh select "$RESTORE_SOURCE" || true
         echo '启用验证未通过，已恢复原安装。' >&2
     else
         open -a "$DESTINATION" --args --settings
@@ -44,7 +48,9 @@ for PREVIOUS in "$HOME/Library/Input Methods/方寸输入法.app" "$HOME/Library
     fi
 done
 open -a "$DESTINATION" --args --settings
-if [ "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.Hans' ]; then
-    ./scripts/input-sources.sh select "$PREVIOUS_SOURCE"
+if [[ "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.Hans' || "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.English' ]]; then
+    # The internal English mode is selected by the active IMK client, not TIS.
+    # After restarting return to the normal FangCun entry, ready for Shift.
+    ./scripts/input-sources.sh select "$RESTORE_SOURCE"
 fi
 echo "已更新并启用方寸输入法：$DESTINATION"

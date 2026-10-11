@@ -18,6 +18,7 @@ if [ ! -f "$RIME/include/rime_api.h" ] || [ ! -s Resources/pinyin_simp.dict.yaml
     exit 1
 fi
 if [ ! -s Resources/AppIcon.icns ] || [ ! -s Resources/InputMenuIcon-v6.pdf ]; then swift scripts/MakeIcon.swift; fi
+if [ ! -s Resources/InputMenuEnglish-v1.pdf ]; then swift scripts/MakeIcon.swift --english-menu-only; fi
 python3 scripts/prepare-double-pinyin.py
 for ARCH in "${ARCHS[@]}"; do
     case "$ARCH" in x86_64|arm64) ;; *) echo "不支持的架构：$ARCH" >&2; exit 1 ;; esac

@@ -16,6 +16,7 @@ final class TextClient: NSObject, IMKTextInput {
     private var pendingChanges: [() -> Void] = []
     var pendingChangeCount: Int { pendingChanges.count }
     var insertedRanges: [NSRange] = []
+    var selectedModes: [String] = []
     let text: NSTextView
     init(text:NSTextView = NSTextView(frame:NSRect(x:0,y:0,width:600,height:200)),identity:String = UUID().uuidString,bundleID:String = "com.fangcun.ControllerTests") {
         self.text = text; self.identity = identity; self.bundleID = bundleID; super.init()
@@ -42,7 +43,7 @@ final class TextClient: NSObject, IMKTextInput {
     func attributes(forCharacterIndex index:Int, lineHeightRectangle rect:UnsafeMutablePointer<NSRect>!) -> [AnyHashable:Any]! { rect.pointee = NSRect(x:100,y:300,width:1,height:20); return [:] }
     func validAttributesForMarkedText() -> [Any]! { [] }
     func overrideKeyboard(withKeyboardNamed name:String!) {}
-    func selectMode(_ identifier:String!) {}
+    func selectMode(_ identifier:String!) { if let identifier { selectedModes.append(identifier) } }
     func supportsUnicode() -> Bool { true }
     func bundleIdentifier() -> String! { bundleID }
     func windowLevel() -> CGWindowLevel { 0 }

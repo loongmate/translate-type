@@ -9,6 +9,7 @@ final class TTInputController: IMKInputController {
     private var activeClient: (any IMKTextInput)?
     private var isActive = false
     private var shiftTap = ShiftTap()
+    private var nativeModeID: String?
     private let inputSessionID = UUID()
     private var observingChanges = false
     private func bind(_ state:CompositionSession) {
@@ -24,7 +25,7 @@ final class TTInputController: IMKInputController {
     private var editorResumeAction: DraftEditor.ResumeAction {
         { [weak self] state,client in
             guard let self else { return false }
-            if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID && InputSourceStatus.currentID != InputSourceStatus.modeID { return false }
+            if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID && !InputSourceStatus.isOurMode(InputSourceStatus.currentID) { return false }
             self.session = state; self.activeClient = client; self.isActive = true
             self.bind(state)
             state.endEditor(); self.refresh(); return true
@@ -64,13 +65,22 @@ final class TTInputController: IMKInputController {
         if session == nil {
             do {
                 session = try newSession()
-                if !observingChanges {
-                    observingChanges = true
-                    NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
-                    NotificationCenter.default.addObserver(self,selector:#selector(pinyinLayoutChanged),name:.pinyinLayoutChanged,object:nil)
-                    DistributedNotificationCenter.default().addObserver(self,selector:#selector(inputSourceChanged),name:Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),object:nil)
-                }
             } catch { NSLog("方寸输入法：拼音初始化失败"); return }
+        }
+        // macOS may deliver its initial mode before activateServer, which
+        // already creates the session. Observers still belong to this controller.
+        if !observingChanges {
+            observingChanges = true
+            NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
+            NotificationCenter.default.addObserver(self,selector:#selector(pinyinLayoutChanged),name:.pinyinLayoutChanged,object:nil)
+            DistributedNotificationCenter.default().addObserver(self,selector:#selector(inputSourceChanged),name:Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),object:nil)
+        }
+        if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID {
+            let source = InputSourceStatus.currentID
+            if InputSourceStatus.isOurMode(source) {
+                nativeModeID = source
+                session?.setASCIIMode(source == InputSourceStatus.englishModeID)
+            }
         }
         pinyinLayoutChanged()
         refresh()
@@ -122,6 +132,14 @@ final class TTInputController: IMKInputController {
     private func refresh() {
         guard isActive, let session, !session.isInEditor, let client = activeClient else { return }
         guard !DraftEditor.shared.suspendsHostUpdates(in:client,sessionID:inputSessionID) else { return }
+        let mode = session.asciiMode ? InputSourceStatus.englishModeID : InputSourceStatus.modeID
+        if nativeModeID != mode {
+            // Use the client's input-mode channel: the hidden English mode
+            // changes the existing system icon without creating a status item.
+            // Record first because macOS may echo setValue synchronously.
+            nativeModeID = mode
+            client.selectMode(mode)
+        }
         let text = session.markedText
         let marked = client.markedRange()
         // Some clients return a zero-length marked range when there is no
@@ -132,6 +150,16 @@ final class TTInputController: IMKInputController {
         panel.show(session:session,anchor:rect,expand:{ [weak self] in self?.openEditor() },ask:{ [weak self] in self?.openAIQuestion() }) { SettingsWindow.shared.show() }
     }
     deinit { NotificationCenter.default.removeObserver(self); DistributedNotificationCenter.default().removeObserver(self) }
+    nonisolated override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
+        guard tag == Int(kTextServiceInputModePropertyTag), let mode = value as? String,
+              InputSourceStatus.isOurMode(mode) else { super.setValue(value,forTag:tag,client:sender); return }
+        MainActor.assumeIsolated {
+            nativeModeID = mode
+            if let client = sender as? any IMKTextInput { activeClient = client }
+            if session == nil { session = try? newSession() }
+            session?.setASCIIMode(mode == InputSourceStatus.englishModeID)
+        }
+    }
     @objc private func inputSourceChanged() {
         let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         guard let pointer = TISGetInputSourceProperty(source,kTISPropertyInputSourceID) else { return }

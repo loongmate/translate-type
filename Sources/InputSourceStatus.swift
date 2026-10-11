@@ -5,6 +5,8 @@ enum InputSourceStatus {
     // Keep the already-enabled system identity stable across branding changes.
     static let bundleID = "com.translatetype.inputmethod.TranslateType"
     static let modeID = bundleID + ".Hans"
+    static let englishModeID = bundleID + ".English"
+    static func isOurMode(_ id:String) -> Bool { id == modeID || id == englishModeID }
     static let legacyBundleIDs = ["com.fangcun.inputmethod.FangCun", "com.apple.inputmethod.translatetype"]
 
     struct RegistrationError: LocalizedError {
@@ -42,7 +44,7 @@ enum InputSourceStatus {
     static func enable(at url: URL = Bundle.main.bundleURL, replacingCurrentID: String? = nil) throws {
         let previousID = replacingCurrentID ?? currentID
         try register(at: url)
-        for id in [bundleID, modeID] {
+        for id in [bundleID, modeID, englishModeID] {
             guard let source = sources().first(where: { identifier($0) == id }) else {
                 throw RegistrationError(message: "系统尚未识别方寸输入法，请重新登录后再添加。")
             }
@@ -54,6 +56,8 @@ enum InputSourceStatus {
         guard isAvailable else {
             throw RegistrationError(message: "macOS 未自动启用方寸输入法。请打开系统键盘设置，在「编辑 → ＋ → 简体中文」添加「方寸输入法」。旧输入法仍保留。")
         }
+        // English stays invisible in the system UI even when enabled. Select
+        // it through the active IMK client so input state and icon move together.
         try finishMigration(replacingCurrentID: previousID)
     }
     static func finishMigration(replacingCurrentID: String? = nil) throws {

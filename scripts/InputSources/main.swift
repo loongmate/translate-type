@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 if args.first == "current" { print(InputSourceStatus.currentID); exit(0) }
 if args.first == "prepare-update" {
     let previous = InputSourceStatus.currentID
-    if previous == InputSourceStatus.modeID || InputSourceStatus.isLegacy(previous) {
+    if InputSourceStatus.isOurMode(previous) || InputSourceStatus.isLegacy(previous) {
         let ascii = TISCopyCurrentASCIICapableKeyboardLayoutInputSource().takeRetainedValue()
         guard TISSelectInputSource(ascii) == noErr else { fputs("更新前无法切换到备用键盘。\n",stderr); exit(1) }
     }
@@ -30,7 +30,7 @@ do {
 var found = false
 for source in InputSourceStatus.sources() {
     let id = InputSourceStatus.identifier(source)
-    guard id == InputSourceStatus.bundleID || id == InputSourceStatus.modeID || InputSourceStatus.isLegacy(id) else { continue }
+    guard id == InputSourceStatus.bundleID || InputSourceStatus.isOurMode(id) || InputSourceStatus.isLegacy(id) else { continue }
     if id == InputSourceStatus.modeID { found = true }
     print("Source: \(id), name=\(property(source, kTISPropertyLocalizedName)), enabled=\(InputSourceStatus.flag(source, kTISPropertyInputSourceIsEnabled)), selectable=\(InputSourceStatus.flag(source, kTISPropertyInputSourceIsSelectCapable))")
 }
