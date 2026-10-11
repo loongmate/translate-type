@@ -26,7 +26,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>24</string>
+	<string>25</string>
 	<key>InputMethodConnectionName</key>
 	<string>com.translatetype.inputmethod.TranslateType_Connection</string>
 	<key>InputMethodServerControllerClass</key>
@@ -68,7 +68,7 @@
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
 				<key>tsInputModeIsVisibleKey</key>
-				<false/>
+				<true/>
 				<key>tsInputModeMenuIconFileKey</key>
 				<string>InputMenuEnglish-v1.pdf</string>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
@@ -109,6 +109,7 @@
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
 			<string>com.translatetype.inputmethod.TranslateType.Hans</string>
+			<string>com.translatetype.inputmethod.TranslateType.English</string>
 		</array>
 	</dict>
 	<key>CFBundleIconFile</key>

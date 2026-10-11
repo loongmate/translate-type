@@ -56,8 +56,8 @@ enum InputSourceStatus {
         guard isAvailable else {
             throw RegistrationError(message: "macOS 未自动启用方寸输入法。请打开系统键盘设置，在「编辑 → ＋ → 简体中文」添加「方寸输入法」。旧输入法仍保留。")
         }
-        // English stays invisible in the system UI even when enabled. Select
-        // it through the active IMK client so input state and icon move together.
+        // Enable both visible native modes. IMK selects the mode of the active
+        // client, and the system input menu owns their single menu-bar indicator.
         try finishMigration(replacingCurrentID: previousID)
     }
     static func finishMigration(replacingCurrentID: String? = nil) throws {

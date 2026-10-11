@@ -134,8 +134,8 @@ final class TTInputController: IMKInputController {
         guard !DraftEditor.shared.suspendsHostUpdates(in:client,sessionID:inputSessionID) else { return }
         let mode = session.asciiMode ? InputSourceStatus.englishModeID : InputSourceStatus.modeID
         if nativeModeID != mode {
-            // Use the client's input-mode channel: the hidden English mode
-            // changes the existing system icon without creating a status item.
+            // Both modes must be visible in the system's input-mode list;
+            // a hidden mode can change TIS state without updating the menu icon.
             // Record first because macOS may echo setValue synchronously.
             nativeModeID = mode
             client.selectMode(mode)

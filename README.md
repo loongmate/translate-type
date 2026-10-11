@@ -63,7 +63,7 @@ API Key 按服务地址分别保存在 macOS 钥匙串，普通配置存入应�
 
 ## 验证
 
-build 24 让系统输入菜单图标随中英文模式切换，使用同一输入法的内部英文模式。`./scripts/mode-icon-test.sh` 通过独立测试窗口的输入上下文验证「方 → 英 → 方」及系统实际引用的图标文件；无需全局按键投递权限。详见 [中英文图标验收](docs/testing/mode-icon-build24.md)。
+build 25 修正 build 24 将英文模式对系统界面隐藏的配置；中文和英文使用同一输入法的两个可见模式及各自图标，仍只有一个系统菜单栏位置。`./scripts/mode-icon-test.sh` 检查模式、图标文件和菜单栏的辅助功能描述；没有辅助功能权限时明确跳过界面检查。它不检查菜单栏像素。详见 [中英文图标验收更正](docs/testing/mode-icon-build25.md)。
 
 build 23 修复临时编辑区保留草稿时，回到原输入框先按 Shift 无法切英文的问题，并兼容重复的 Shift 修饰键通知。详见 [Shift 切换回归](docs/testing/shift-switch-build23.md)。
 

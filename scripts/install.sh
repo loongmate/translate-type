@@ -49,8 +49,7 @@ for PREVIOUS in "$HOME/Library/Input Methods/方寸输入法.app" "$HOME/Library
 done
 open -a "$DESTINATION" --args --settings
 if [[ "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.Hans' || "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.English' ]]; then
-    # The internal English mode is selected by the active IMK client, not TIS.
-    # After restarting return to the normal FangCun entry, ready for Shift.
+    # After restarting return to the normal Chinese entry, ready for Shift.
     ./scripts/input-sources.sh select "$RESTORE_SOURCE"
 fi
 echo "已更新并启用方寸输入法：$DESTINATION"

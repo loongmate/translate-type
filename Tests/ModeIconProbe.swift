@@ -1,21 +1,23 @@
 import AppKit
 import Carbon
+import ApplicationServices
 
 // Own host application only. Sends flagsChanged to its NSTextInputContext,
 // which reaches the installed IME across processes; never posts global keys.
-// This verifies mode/icon synchronization, not physical keyboard text input.
+// Also checks the menu bar's accessibility description when permitted. This
+// does not capture menu-bar pixels or replace a physical keyboard input test.
 @MainActor final class ModeIconProbe: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let text = NSTextView()
     private var previous: String?
     private var report = ""
+    private var menuChecks = 0
     private let chinese = "com.translatetype.inputmethod.TranslateType.Hans"
     private let english = "com.translatetype.inputmethod.TranslateType.English"
     private func log(_ message:String) { report += message + "\n" }
     private func finish(_ message:String) {
         log(message)
-        // Invisible modes are not selectable via TIS; restore the parent entry.
-        if let previous { text.inputContext?.selectedKeyboardInputSource = previous == english ? chinese : previous }
+        if let previous { text.inputContext?.selectedKeyboardInputSource = previous }
         if CommandLine.arguments.count > 1 {
             try? report.write(toFile:CommandLine.arguments[1],atomically:true,encoding:.utf8)
         }
@@ -43,12 +45,13 @@ import Carbon
                 try await wait(1.2)
                 guard checkMode(chinese,icon:"InputMenuIcon-v6.pdf") else { return }
                 guard shift(true) else { return }; try await wait(0.08); guard shift(false) else { return }
-                try await wait(0.4)
+                try await wait(1)
                 guard checkMode(english,icon:"InputMenuEnglish-v1.pdf") else { return }
                 guard shift(true) else { return }; try await wait(0.08); guard shift(false) else { return }
-                try await wait(0.4)
+                try await wait(1)
                 guard checkMode(chinese,icon:"InputMenuIcon-v6.pdf") else { return }
-                finish("MODE ICON INTEGRATION PASSED: 方 → 英 → 方")
+                log("MENU BAR ACCESSIBILITY: \(menuChecks)/3 states checked; pixels not captured")
+                finish("MODE ICON METADATA PASSED: 方 → 英 → 方 (menu-bar pixels not checked)")
             } catch { finish("FAIL: \(error.localizedDescription)") }
         }
     }
@@ -67,7 +70,30 @@ import Carbon
               (Unmanaged<CFURL>.fromOpaque(pointer).takeUnretainedValue() as URL).lastPathComponent == icon else {
             finish("FAIL: 系统当前模式或图标未更新为 \(mode)"); return false
         }
-        log("PASS: \(mode) / \(icon)"); return true
+        log("PASS: \(mode) / \(icon)")
+        return checkMenu(mode)
+    }
+    private func checkMenu(_ mode:String) -> Bool {
+        guard AXIsProcessTrusted() else { log("SKIP: Menu-bar accessibility not permitted"); return true }
+        guard let agent = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.TextInputMenuAgent" }) else {
+            finish("FAIL: Input menu agent unavailable"); return false
+        }
+        func attribute(_ element:AXUIElement,_ key:String) -> CFTypeRef? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element,key as CFString,&value) == .success else { return nil }
+            return value
+        }
+        let application = AXUIElementCreateApplication(agent.processIdentifier)
+        let menuBars = (attribute(application,kAXChildrenAttribute) as? [AXUIElement] ?? []).filter {
+            attribute($0,kAXRoleAttribute) as? String == kAXMenuBarRole
+        }
+        let descriptions = menuBars.flatMap { attribute($0,kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+            .compactMap { attribute($0,kAXDescriptionAttribute) as? String }
+        let expected = mode == english ? "方寸输入法 · 英文" : "方寸输入法"
+        guard descriptions.contains(expected) else {
+            finish("FAIL: Menu-bar description expected \(expected), got \(descriptions)"); return false
+        }
+        menuChecks += 1; log("PASS: menu-bar description = \(expected)"); return true
     }
     private func shift(_ down:Bool) -> Bool {
         guard hasFocus, let context = text.inputContext else { finish("FAIL: 验证中窗口失焦"); return false }

@@ -11,6 +11,18 @@ for source in sources {
     guard let imagePointer = TISGetInputSourceProperty(source,kTISPropertyIconImageURL) else { fatalError("System icon missing") }
     let url = Unmanaged<CFURL>.fromOpaque(imagePointer).takeUnretainedValue() as URL
     let english = id == prefix + ".English"
+    if id == prefix + ".Hans" || english {
+        // The icon URL alone is insufficient: a hidden mode may change in TIS
+        // while the system menu keeps the previous visible mode's icon.
+        let installed = url.deletingLastPathComponent().deletingLastPathComponent()
+        let data = try! Data(contentsOf:installed.appendingPathComponent("Info.plist"))
+        let info = try! PropertyListSerialization.propertyList(from:data,format:nil) as! [String:Any]
+        let modes = info["ComponentInputModeDict"] as! [String:Any]
+        let mode = (modes["tsInputModeListKey"] as! [String:[String:Any]])[id]!
+        precondition(mode["tsInputModeIsVisibleKey"] as? Bool == true,"The icon mode must be visible in system UI")
+        precondition((modes["tsVisibleInputModeOrderedArrayKey"] as! [String]).contains(id),"The mode must appear in system UI order")
+        print("PASS: installed mode is visible in system UI:",id)
+    }
     precondition(url.lastPathComponent == (english ? "InputMenuEnglish-v1.pdf" : "InputMenuIcon-v6.pdf"),"System must load the corresponding vector icon")
     guard let image = NSImage(contentsOf:url), image.isValid, image.size == NSSize(width:16,height:16) else { fatalError("System image cannot load") }
     guard let namePointer = TISGetInputSourceProperty(source,kTISPropertyLocalizedName) else { fatalError("Name missing") }

@@ -17,11 +17,22 @@ cat > "$PROBE/Contents/Info.plist" <<'PLIST'
 PLIST
 codesign --force --sign - "$PROBE"
 rm -f "$REPORT"
-open -n -a "$PROBE" --args "$REPORT"
+PREVIOUS_SOURCE=$(./scripts/input-sources.sh current)
+# Run the bundled test executable from this test runner, as controller-test.sh
+# does. macOS still checks this process's own accessibility permission; the
+# probe records SKIP rather than requesting or bypassing unavailable access.
+"$PROBE/Contents/MacOS/ModeIconProbe" "$REPORT" &
+PROBE_PID=$!
+cleanup() {
+    kill "$PROBE_PID" 2>/dev/null || true
+    wait "$PROBE_PID" 2>/dev/null || true
+    ./scripts/input-sources.sh select "$PREVIOUS_SOURCE" || true
+}
+trap cleanup EXIT
 for ((attempt=0; attempt<20; attempt++)); do
     if [ -f "$REPORT" ]; then
         cat "$REPORT"
-        if rg -q '^MODE ICON INTEGRATION PASSED:' "$REPORT"; then exit 0; fi
+        if rg -q '^MODE ICON METADATA PASSED:' "$REPORT"; then exit 0; fi
         if rg -q '^SKIP:' "$REPORT"; then exit 77; fi
         exit 1
     fi
