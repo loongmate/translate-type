@@ -18,7 +18,11 @@ struct ShiftTap {
         if shift {
             if pressedKey == nil {
                 pressedKey = keyCode; pressedAt = timestamp; eligible = !otherModifier
-            } else { eligible = false }
+            } else if pressedKey != keyCode || otherModifier {
+                eligible = false
+            }
+            // Duplicate flagsChanged notifications for the held key do not
+            // form a chord. Keep the original timestamp and cancellation state.
             return false
         }
         let duration = timestamp - pressedAt

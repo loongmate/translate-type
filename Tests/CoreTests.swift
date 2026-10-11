@@ -196,6 +196,16 @@ struct CoreTests {
         check(!tap.flagsChanged(shift:false,otherModifier:false,keyCode:56,timestamp:30.1),"Shift 配合鼠标选中内容不切英文")
         _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:60,timestamp:40)
         check(tap.flagsChanged(shift:false,otherModifier:false,keyCode:60,timestamp:40.1),"右 Shift 也支持轻按切换")
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:56,timestamp:50)
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:56,timestamp:50.02)
+        check(tap.flagsChanged(shift:false,otherModifier:false,keyCode:56,timestamp:50.1),"重复 Shift 按下通知不取消单击切换")
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:60,timestamp:60)
+        tap.keyDown()
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:60,timestamp:60.02)
+        check(!tap.flagsChanged(shift:false,otherModifier:false,keyCode:60,timestamp:60.1),"重复通知不重新激活已被打字取消的 Shift")
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:56,timestamp:70)
+        _ = tap.flagsChanged(shift:true,otherModifier:false,keyCode:56,timestamp:70.4)
+        check(!tap.flagsChanged(shift:false,otherModifier:false,keyCode:56,timestamp:70.6),"重复通知不重置长按计时")
         let deepSeekBody = try JSONSerialization.jsonObject(with:TranslationClient.requestBody("你好",configuration:ModelConfiguration(endpoint:"https://api.deepseek.com",model:"deepseek-flash"))) as! [String:Any]
         check((deepSeekBody["thinking"] as? [String:String])?["type"] == "disabled","DeepSeek 请求明确关闭思考模式")
         let genericBody = try JSONSerialization.jsonObject(with:TranslationClient.requestBody("你好",configuration:ModelConfiguration(endpoint:"http://localhost:18887/v1",model:"test"))) as! [String:Any]

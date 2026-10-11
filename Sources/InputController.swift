@@ -100,7 +100,9 @@ final class TTInputController: IMKInputController {
         guard event.type == .keyDown || event.type == .flagsChanged else { return false }
         if !isActive || activeClient == nil { activateServer(sender) }
         if let client = sender as? any IMKTextInput { activeClient = client }
-        if session == nil && !DraftEditor.shared.hasDraft { session = try? newSession() }
+        // The editor owns its detached session. The host still needs a fresh
+        // one for Shift, even before the first letter and while that draft lives.
+        if session == nil { session = try? newSession() }
         let flags = event.modifierFlags
         if event.type == .flagsChanged {
             let other = !flags.intersection([.command,.control,.option,.capsLock]).isEmpty

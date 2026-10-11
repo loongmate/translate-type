@@ -63,6 +63,8 @@ API Key 按服务地址分别保存在 macOS 钥匙串，普通配置存入应�
 
 ## 验证
 
+build 23 修复临时编辑区保留草稿时，回到原输入框先按 Shift 无法切英文的问题，并兼容重复的 Shift 修饰键通知。详见 [Shift 切换回归](docs/testing/shift-switch-build23.md)。
+
 build 22 将原型的「改文字 / 问 AI」接入原生编辑区，复用已修复的宿主上屏流程。详见 [原生 AI 动作与问答](docs/testing/ai-actions-build22.md)。
 
 完整输入规则、各种输入形式、易用性任务和失败记录见 [输入行为与易用性验收](docs/input-behavior-and-usability.md)。build 11 存在失焦丢掉未选尾部、部分选词被还原成拼音、草稿光标编辑不正确等问题，尚未通过日常使用验收。下面的既有回归测试通过，不代表这些缺口也已通过。

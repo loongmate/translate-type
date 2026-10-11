@@ -253,6 +253,48 @@ import InputMethodKit
         check(editor.session?.canRequestTranslation == false && editor.source.string.count == 20_001,"超出翻译上限只禁用翻译，长草稿完整可编辑")
         try await closeDraft(); plainController.deactivateServer(plainClient)
 
+        // A hidden editor can keep its draft while the originating controller
+        // has detached its session. Shift must still work before any new letter.
+        let hiddenClient = TextClient()
+        let hiddenController = TTInputController(server:server,delegate:nil,client:hiddenClient)!
+        hiddenController.activateServer(hiddenClient)
+        hiddenController.openEditor()
+        try await tick()
+        editor.session?.replaceEditorText("保留草稿",selection:NSRange(location:4,length:0))
+        let retainedEditor = editor.session
+        editor.hide()
+        func hiddenShift(_ down:Bool) {
+            timestamp += 0.05
+            let e = NSEvent.keyEvent(with:.flagsChanged,location:.zero,modifierFlags:down ? [.shift] : [],timestamp:timestamp,windowNumber:0,context:nil,characters:"",charactersIgnoringModifiers:"",isARepeat:false,keyCode:56)!
+            _ = hiddenController.handle(e,client:hiddenClient)
+        }
+        hiddenShift(true); hiddenShift(false)
+        for c in "logo" { _ = hiddenController.handle(event(String(c)),client:hiddenClient) }
+        check(hiddenClient.text.string == "logo" && !hiddenClient.text.hasMarkedText(),"编辑区保留草稿时，原输入框先按 Shift 仍可直接输入英文")
+        check(editor.session === retainedEditor && editor.session?.draft == "保留草稿","原输入框切英文不会取走或改写编辑区草稿")
+        hiddenShift(true); hiddenShift(false)
+        for c in "nihao" { _ = hiddenController.handle(event(String(c)),client:hiddenClient) }
+        _ = hiddenController.handle(event(" ",49),client:hiddenClient)
+        check(hiddenClient.text.string == "logo你好" && !hiddenClient.text.hasMarkedText(),"编辑区保留草稿时，再次 Shift 可恢复中文")
+        hiddenController.openEditor(); try await tick()
+        editor.recoverDestination(); try await tick()
+        try await closeDraft(); hiddenController.deactivateServer(hiddenClient)
+
+        let repeatedState = CompositionSession(engine:try PinyinEngine(layout:.fullPinyin),translateEnabled:false)
+        editor.open(session:repeatedState,client:TextClient(),resume:{ _,_ in false }); try await tick()
+        func editorShift(_ down:Bool) {
+            timestamp += 0.05
+            let e = NSEvent.keyEvent(with:.flagsChanged,location:.zero,modifierFlags:down ? [.shift] : [],timestamp:timestamp,windowNumber:editor.window.windowNumber,context:nil,characters:"",charactersIgnoringModifiers:"",isARepeat:false,keyCode:60)!
+            editor.source.flagsChanged(with:e)
+        }
+        editorShift(true); editorShift(true); editorShift(false)
+        type("logo")
+        check(repeatedState.asciiMode && repeatedState.draft == "logo" && !repeatedState.hasPendingInput,"编辑区重复右 Shift 通知仍切换到英文")
+        editorShift(true); editorShift(false)
+        type("nihao"); key(" ",49)
+        check(!repeatedState.asciiMode && repeatedState.draft == "logo你好","编辑区再次右 Shift 恢复中文")
+        try await closeDraft()
+
         // Exercise the same window key-equivalent / responder routes used by
         // real Cmd+Enter, including selected destination text and Unicode.
         let shortcutClient = TextClient()
