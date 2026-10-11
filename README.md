@@ -116,3 +116,9 @@ Rime 1.17.0 从官方 release 下载，校验 SHA-256；其许可证随应用资
 参考：[Apple InputMethodKit](https://developer.apple.com/documentation/inputmethodkit)、[Rime API](https://github.com/rime/librime/blob/master/src/rime_api.h)、[简体拼音词库](https://github.com/rime/rime-pinyin-simp)。
 
 当前使用本机临时代码签名，适用于开发验证；外部分发时需正式签名和公证。
+
+## 发布准备
+
+通用构建：`FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh`，同时生成 Intel 与 Apple Silicon 架构。随后运行 `./scripts/package-preview.sh` 可生成带安装说明和 SHA-256 的本地预览 ZIP。预览包尚未正式签名、公证，Apple Silicon 仍需实机验收。
+
+安装器、Developer ID、公证、升级和首次发版步骤见 [发布方案](docs/distribution.md)。
