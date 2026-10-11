@@ -1,6 +1,6 @@
 # 方寸输入法发布方案
 
-调查日期：2026-10-11。第一版通过 GitHub Releases 分别提供 **Apple Silicon 版（M 系列芯片）** 和 **Intel 版**，版本标为 `0.1.0-beta.1`，先进行小范围测试，再开放正式下载。
+调查日期：2026-10-11。第一版按预览版发布到 GitHub Releases，分别提供 **Apple Silicon 版（M 系列芯片）** 和 **Intel 版**，版本为 `0.1.0-beta.1`。本版保留开发签名，Developer ID 和 Apple 公证后续补齐；用户在系统设置中为该应用确认“仍要打开”。下载与安装说明见 [预览版发布说明](releases/v0.1.0-beta.1.md)。
 
 ## 当前具备什么
 
@@ -20,12 +20,12 @@ FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh
 
 | 下载版本 | 架构 | 本轮大小 | 本地文件 |
 | --- | --- | --- | --- |
-| Apple Silicon 版 · M 系列 | arm64 | 9,075,401 字节 | `dist/FangCun-0.1.0-build22-AppleSilicon-preview.zip` |
-| Intel 版 | x86_64 | 9,207,916 字节 | `dist/FangCun-0.1.0-build22-Intel-preview.zip` |
+| Apple Silicon 版 · M 系列 | arm64 | 9,075,718 字节 | `dist/FangCun-0.1.0-build22-AppleSilicon-preview.zip` |
+| Intel 版 | x86_64 | 9,208,235 字节 | `dist/FangCun-0.1.0-build22-Intel-preview.zip` |
 
 单架构应用同时保留在 `build/releases/AppleSilicon/FangCun.app` 和 `build/releases/Intel/FangCun.app`，供之后分别正式签名、打包。旧通用预览包移至 `.build/retired-distributions/`，下载目录只提供本版本的两种芯片包。
 
-这些是本地打包预览，**尚非可正式分发的安装器**。构建和 ZIP 校验通过不等于新机器安装通过，Apple Silicon 和 macOS 13 还需实机验收。本轮两份包均通过压缩包 CRC、解压签名、主程序及动态库单一架构、最低系统版本、可执行权限、文件一致性和 SHA-256 校验；重新打包可能因时间戳不同改变摘要，以同次生成的 `.sha256` 为准。
+这些是需手动安装的预览 ZIP，**没有一键安装器和正式签名、公证**。构建和 ZIP 校验通过不等于新机器安装通过，Apple Silicon 和 macOS 13 还需实机验收。本轮两份包均通过压缩包 CRC、解压签名、主程序及动态库单一架构、最低系统版本、可执行权限、文件一致性和 SHA-256 校验；重新打包可能因时间戳不同改变摘要，以同次生成的 `.sha256` 为准。
 
 ## 给普通用户的安装体验
 
@@ -100,6 +100,6 @@ done
 
 ## 发版操作
 
-完成上述准备后，将确认过的代码标记 `v0.1.0-beta.1`，创建一个 GitHub Release 草稿，同时附上 Apple Silicon、Intel 两份签名公证的安装包，以及各自 SHA-256、更新说明和对应源码/第三方许可材料。两份包保持相同产品版本与 build。先确认草稿中的文件与实际验证过的文件摘要一致，再发布供下载。自动更新可在后续版本加入，更新时也必须按本机架构选择；首版通过新安装包升级。
+本次使用 `v0.1.0-beta.1` 标签，创建标记为 Pre-release 的 GitHub Release，上传两份预览 ZIP 和各自 SHA-256。发布说明明确未正式签名、公证，包含“仍要打开”的系统操作指引，不等待正式签名完成。两份包保持相同产品版本与 build；先核对草稿资产与本机验证文件的摘要，再发布供下载。
 
-本轮只推送代码、准备两种芯片的本地预览包，没有创建 Release、推送版本标签或更改仓库可见性。
+正式版继续按上文完成独立安装器、签名公证、第三方材料和新机器验收。自动更新可在后续版本加入，更新时必须按本机架构选择。发布不更改仓库可见性。

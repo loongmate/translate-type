@@ -2,6 +2,12 @@
 
 macOS 原生输入法：离线中文拼音 + 用户主动触发的整句中英翻译。使用 Swift、AppKit、InputMethodKit 与 Rime；没有网页主界面。
 
+## 下载预览版
+
+[0.1.0-beta.1（build 22）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.1) 分别提供 Apple Silicon（M 系列）和 Intel 版本，目标系统为 macOS 13+。下载页包含安装方法、校验值和已知限制。
+
+此预览版尚无 Developer ID 签名或 Apple 公证，首次打开可能需要在「系统设置 → 隐私与安全性」中点击「仍要打开」。本版采用手动安装；实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装与发布说明](docs/releases/v0.1.0-beta.1.md)。
+
 ## 本机构建和安装
 
 需要 macOS 13+、Xcode Command Line Tools 和 Python 3。当前开发验证机器为 macOS 14.7.4 / Intel。

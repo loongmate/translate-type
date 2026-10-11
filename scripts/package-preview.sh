@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local preview archive only. Does not install, notarize, or publish a release.
+# Prepare unsigned preview archives. Does not install, notarize, or upload them.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 APP="$PWD/build/FangCun.app"
@@ -58,4 +58,4 @@ for EXT in zip zip.sha256; do
     OLD="dist/FangCun-$VERSION-build$BUILD-universal-preview.$EXT"
     if [ -f "$OLD" ]; then mv "$OLD" .build/retired-distributions/; fi
 done
-echo '仅有开发签名，未做 Apple 公证；不能作为正式安装包发布。'
+echo '预览包仅有开发签名，未做 Apple 公证；发布时需明确此状态及手动安装步骤。'
