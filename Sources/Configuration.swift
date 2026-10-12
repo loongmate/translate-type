@@ -122,6 +122,10 @@ final class ConfigurationStore {
         get { defaults.bool(forKey:"translateEnabled") }
         set { defaults.set(newValue,forKey:"translateEnabled") }
     }
+    var contextAwarenessEnabled: Bool {
+        get { defaults.object(forKey:"contextAwarenessEnabled") as? Bool ?? true }
+        set { defaults.set(newValue,forKey:"contextAwarenessEnabled") }
+    }
     var pinyinLayout: PinyinLayout {
         get { PinyinLayout(rawValue:defaults.string(forKey:"pinyinLayout") ?? "") ?? .fullPinyin }
         set {

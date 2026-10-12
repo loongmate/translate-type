@@ -11,6 +11,7 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     private let inputStatus = NSTextField(wrappingLabelWithString:"")
     private let addButton = NSButton()
     private let pinyinMode = NSPopUpButton()
+    private let contextAwareness = NSButton(checkboxWithTitle:"连续输入时感知上下文",target:nil,action:nil)
     private let doublePinyin = NSPopUpButton()
     private let editorShortcut = ShortcutRecorder()
     private let pinyinExample = NSTextField(wrappingLabelWithString:"")
@@ -39,6 +40,7 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     func windowDidBecomeKey(_ notification:Notification) { updateInputStatus(); updatePinyinControls() }
     @objc private func updatePinyinControls() {
         let store = ConfigurationStore.shared
+        contextAwareness.state = store.contextAwarenessEnabled ? .on : .off
         pinyinMode.selectItem(at:store.pinyinLayout == .fullPinyin ? 0 : 1)
         doublePinyin.isEnabled = store.pinyinLayout != .fullPinyin
         doublePinyin.selectItem(at:PinyinLayout.doublePinyin.firstIndex(of:store.lastDoublePinyinLayout) ?? 0)
@@ -49,6 +51,10 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     @objc private func changePinyinMode() {
         ConfigurationStore.shared.pinyinLayout = pinyinMode.indexOfSelectedItem == 0 ? .fullPinyin : ConfigurationStore.shared.lastDoublePinyinLayout
         NotificationCenter.default.post(name:.pinyinLayoutChanged,object:nil)
+    }
+    @objc private func changeContextAwareness() {
+        ConfigurationStore.shared.contextAwarenessEnabled = contextAwareness.state == .on
+        NotificationCenter.default.post(name:.contextAwarenessChanged,object:nil)
     }
     @objc private func changeDoublePinyin() {
         guard PinyinLayout.doublePinyin.indices.contains(doublePinyin.indexOfSelectedItem) else { return }
@@ -76,6 +82,9 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     }
     @objc private func openKeyboardSettings() { AppPresence.shared.openKeyboardSettings() }
     func capture(to url:URL) throws {
+        // Rendering the input settings for tests must not open a window or
+        // read an API key from Keychain.
+        if window == nil { build(); updatePinyinControls(); updateInputStatus() }
         guard let view = window.contentView else { return }
         view.layoutSubtreeIfNeeded()
         view.displayIfNeeded()
@@ -133,6 +142,10 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
         doublePinyin.identifier = NSUserInterfaceItemIdentifier("double-pinyin-layout"); full(doublePinyin)
         pinyinExample.font = .systemFont(ofSize:13); full(pinyinExample)
         full(label("选择后自动保存；正在输入的拼音选完后切换。"))
+        contextAwareness.target = self; contextAwareness.action = #selector(changeContextAwareness)
+        contextAwareness.identifier = NSUserInterfaceItemIdentifier("context-awareness"); full(contextAwareness)
+        let contextHint = NSTextField(wrappingLabelWithString:"连续确认中文后，候选窗显示「上下文」。失焦、移动光标或删改后暂停；重新聚焦并确认中文后再启用。本地处理，不调用 AI。")
+        contextHint.font = .systemFont(ofSize:12); contextHint.textColor = .secondaryLabelColor; full(contextHint)
         full(divider())
         editorShortcut.configure(); full(editorShortcut)
         full(label("在方寸输入法中生效；编辑区 Enter 换行，Ctrl＋Enter 执行 AI 动作。"))
@@ -196,4 +209,5 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
 extension Notification.Name {
     static let modelConfigurationChanged = Notification.Name("TranslateType.modelConfigurationChanged")
     static let pinyinLayoutChanged = Notification.Name("FangCun.pinyinLayoutChanged")
+    static let contextAwarenessChanged = Notification.Name("FangCun.contextAwarenessChanged")
 }

@@ -12,8 +12,17 @@ final class TTInputController: IMKInputController {
     private var nativeModeID: String?
     private let inputSessionID = UUID()
     private var observingChanges = false
+    private let inputContext = ContinuousInputContext()
+    var contextStatus: (active:Bool,dirty:Bool,reason:String) {
+        (session?.contextActive ?? false,inputContext.dirty,inputContext.reason)
+    }
     private func bind(_ state:CompositionSession) {
-        state.onInsert = { [weak self] text in self?.activeClient?.insertText(text,replacementRange:NSRange(location:NSNotFound,length:0)) }
+        state.onInsert = { [weak self] text in
+            self?.inputContext.willInsert(text)
+            self?.activeClient?.insertText(text,replacementRange:NSRange(location:NSNotFound,length:0))
+        }
+        state.onConfirmedDraft = { [weak self] text in self?.inputContext.confirmedDraft(text) }
+        state.onContextInvalidated = { [weak self] reason in self?.inputContext.invalidate(reason) }
         state.onUpdate = { [weak self] in self?.refresh() }
     }
     private func newSession() throws -> CompositionSession {
@@ -35,6 +44,7 @@ final class TTInputController: IMKInputController {
         DraftEditor.shared.hostActivated(client,sessionID:inputSessionID,resume:editorResumeAction)
     }
     @objc func openEditor() {
+        session?.invalidateContext("editor")
         guard let client = activeClient, !DraftEditor.isInternalClient(client) else { return }
         observeHost(client)
         if DraftEditor.shared.hasDraft { DraftEditor.shared.show(); return }
@@ -60,6 +70,7 @@ final class TTInputController: IMKInputController {
     }
     private func activate(_ sender: Any!) {
         guard let client = sender as? any IMKTextInput else { NSLog("方寸输入法：系统未提供文本客户端"); return }
+        inputContext.reset(); session?.setContext(nil)
         observeHost(client)
         activeClient = client; isActive = true; shiftTap.reset()
         if session == nil {
@@ -78,6 +89,7 @@ final class TTInputController: IMKInputController {
 #endif
             NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
             NotificationCenter.default.addObserver(self,selector:#selector(pinyinLayoutChanged),name:.pinyinLayoutChanged,object:nil)
+            NotificationCenter.default.addObserver(self,selector:#selector(contextSettingChanged),name:.contextAwarenessChanged,object:nil)
             DistributedNotificationCenter.default().addObserver(self,selector:#selector(inputSourceChanged),name:Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),object:nil)
         }
         if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID {
@@ -91,9 +103,9 @@ final class TTInputController: IMKInputController {
         refresh()
     }
     nonisolated override func deactivateServer(_ sender: Any!) {
-        MainActor.assumeIsolated { shiftTap.reset(); preserveEditorDraft(); session?.flushOriginal(); panel.orderOut(nil); isActive = false; activeClient = nil }
+        MainActor.assumeIsolated { session?.invalidateContext("focus-lost",preserveHighlight:true); shiftTap.reset(); preserveEditorDraft(); session?.flushOriginal(); panel.orderOut(nil); isActive = false; activeClient = nil }
     }
-    nonisolated override func commitComposition(_ sender: Any!) { MainActor.assumeIsolated { preserveEditorDraft(); session?.flushOriginal() } }
+    nonisolated override func commitComposition(_ sender: Any!) { MainActor.assumeIsolated { session?.invalidateContext("host-commit",preserveHighlight:true); preserveEditorDraft(); session?.flushOriginal() } }
     nonisolated override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask([.keyDown,.flagsChanged,.leftMouseDown,.rightMouseDown,.otherMouseDown]).rawValue)
     }
@@ -107,6 +119,7 @@ final class TTInputController: IMKInputController {
         }
         if let client = sender as? any IMKTextInput { observeHost(client) }
         if [.leftMouseDown,.rightMouseDown,.otherMouseDown].contains(event.type) {
+            session?.invalidateContext("mouse",preserveHighlight:true)
             shiftTap.keyDown()
             preserveEditorDraft()
             session?.flushOriginal()
@@ -131,8 +144,20 @@ final class TTInputController: IMKInputController {
         // Returning to the host to type must not silently restore the editor
         // draft as marked text. Only the explicit shrink action transfers it.
         if session == nil { session = try? newSession() }
-        guard let session, let key = InputKey.value(event) else { return false }
-        return session.handle(key:key,control:flags.contains(.control),shift:flags.contains(.shift),command:flags.contains(.command),option:flags.contains(.option))
+        guard let session else { return false }
+        guard let key = InputKey.value(event) else {
+            session.invalidateContext("unknown-key",preserveHighlight:true); showCandidates(); return false
+        }
+        if ConfigurationStore.shared.contextAwarenessEnabled, !session.asciiMode, !session.isInEditor,
+           let client = sender as? any IMKTextInput {
+            let prefix = inputContext.read(client,hasComposition:!session.markedText.isEmpty)
+            session.setContext(prefix.map { $0 + session.draft })
+        } else { session.invalidateContext("disabled-or-ineligible") }
+        let handled = session.handle(key:key,control:flags.contains(.control),shift:flags.contains(.shift),command:flags.contains(.command),option:flags.contains(.option))
+        // Host navigation/shortcuts also invalidate the badge. Repaint only
+        // the panel here, without rewriting the host's selection/marked text.
+        if !handled { showCandidates() }
+        return handled
     }
     private func refresh() {
         guard isActive, let session, !session.isInEditor, let client = activeClient else { return }
@@ -150,6 +175,12 @@ final class TTInputController: IMKInputController {
         // Some clients return a zero-length marked range when there is no
         // composition. An empty update would then replace the user's selection.
         if !text.isEmpty || (marked.location != NSNotFound && marked.length > 0) { client.setMarkedText(text,selectionRange:NSRange(location:session.markedCaret,length:0),replacementRange:NSRange(location:NSNotFound,length:0)) }
+        inputContext.expectComposition(text,caret:session.markedCaret)
+        showCandidates()
+    }
+    private func showCandidates() {
+        guard isActive, let session, !session.isInEditor, let client = activeClient,
+              !DraftEditor.shared.suspendsHostUpdates(in:client,sessionID:inputSessionID) else { return }
         var rect = NSRect.zero
         _ = client.attributes(forCharacterIndex:0,lineHeightRectangle:&rect)
         panel.show(session:session,anchor:rect,expand:{ [weak self] in self?.openEditor() },ask:{ [weak self] in self?.openAIQuestion() }) { SettingsWindow.shared.show() }
@@ -166,9 +197,15 @@ final class TTInputController: IMKInputController {
            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.fangcun.ContextHostProbe" {
             if action == "begin-pinyin" { _ = session?.handle(key:104) }
             if action == "cancel-pinyin" { _ = session?.handle(key:0xff1b) }
+            if action == "continuous-key", let key = notice.userInfo?["key"] as? Int,
+               [32,97,103,104,105,110,115].contains(key), let scalar = UnicodeScalar(key) {
+                let codes:[Int:UInt16] = [32:49,97:0,103:5,104:4,105:34,110:45,115:1]
+                let event = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:ProcessInfo.processInfo.systemUptime,windowNumber:0,context:nil,characters:String(scalar),charactersIgnoringModifiers:String(scalar),isARepeat:false,keyCode:codes[key]!)!
+                _ = process(event,client:client)
+            }
             return
         }
-        ContextProbe.sample(notice,client:client,hasComposition:session?.markedText.isEmpty == false,session:inputSessionID)
+        ContextProbe.sample(notice,client:client,hasComposition:session?.markedText.isEmpty == false,session:inputSessionID,contextStatus:contextStatus)
     }
 #endif
     nonisolated override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
@@ -197,6 +234,7 @@ final class TTInputController: IMKInputController {
         }
     }
     @objc private func configurationChanged() { session?.configurationChanged() }
+    @objc private func contextSettingChanged() { session?.invalidateContext("setting-changed"); refresh() }
     @objc private func pinyinLayoutChanged() {
         do { try session?.requestPinyinLayout(ConfigurationStore.shared.pinyinLayout) }
         catch { NSLog("拼音方案切换失败：%@",error.localizedDescription) }

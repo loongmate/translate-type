@@ -12,6 +12,8 @@ enum InputKey {
         case 126:return 0xff52
         case 116:return 0xff55
         case 121:return 0xff56
+        case 115:return 0xff50
+        case 119:return 0xff57
         case 117:return 0xffff
         case 48:return 0xff09
         default:

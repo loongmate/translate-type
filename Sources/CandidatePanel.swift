@@ -20,7 +20,9 @@ final class CandidatePanel: NSPanel {
         let screen = NSScreen.screens.first(where:{$0.frame.intersects(anchor)}) ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let composition = CompositionDisplay(session:session)
-        let controlsWidth = ceil((session.asciiMode ? "EN" : session.pinyinLayout.shortName).size(withAttributes:[.font:NSFont.systemFont(ofSize:11)]).width) + (session.isInEditor ? 28 : 85) + (expand == nil ? 0 : 28) + (ask == nil ? 0 : 28)
+        let modeWidth = ceil((session.asciiMode ? "EN" : session.pinyinLayout.shortName).size(withAttributes:[.font:NSFont.systemFont(ofSize:11)]).width)
+        let actionWidth: CGFloat = (session.isInEditor ? 28 : 85) + (expand == nil ? 0 : 28) + (ask == nil ? 0 : 28)
+        let controlsWidth = modeWidth + actionWidth + (session.contextActive ? 50 : 0)
         let candidateWidth = session.candidates.reduce(CGFloat(54)) { $0 + $1.size(withAttributes:[.font:NSFont.systemFont(ofSize:15)]).width + 35 }
         let width = min(max(320,candidateWidth,composition.text.size().width+controlsWidth+38),min(600,visible.width-12))
         let compositionWidth = max(40,width-controlsWidth-38)
@@ -212,6 +214,11 @@ private struct CandidateView: View {
                     .frame(width:compositionWidth,height:compositionHeight)
                     .help("← → 选择候选 · - / + 翻页 · 首项再按 ← 编辑拼音 · 长输入可滚动查看")
                 HStack(spacing:12) {
+                    if session.contextActive {
+                        Text("上下文").font(.system(size:10)).foregroundStyle(purple)
+                            .help("正在参考同一输入框中连续确认的前文，使用本地词库调整候选；移动光标或删改后暂停。")
+                            .accessibilityLabel("上下文感知中")
+                    }
                     Button { session.setASCIIMode(!session.asciiMode) } label: {
                         Text(session.asciiMode ? "EN" : session.pinyinLayout.shortName).font(.system(size:11)).foregroundStyle(.secondary)
                     }.help(session.pendingPinyinLayout.map { "选完当前拼音后切换为\($0.name)" } ?? "\(session.pinyinLayout.name) · Shift 切换中英文")

@@ -19,7 +19,7 @@ python3 Tests/mock_server.py > .build/editor-mock.log 2>&1 &
 MOCK_PID=$!
 trap 'kill "$MOCK_PID" 2>/dev/null || true' EXIT
 TEST_SUITE="${FANGCUN_EDITOR_TEST:-EditorTests}"
-case "$TEST_SUITE" in EditorTests|AIActionTests) ;; *) exit 2 ;; esac
+case "$TEST_SUITE" in EditorTests|AIActionTests|ContextCandidateTests) ;; *) exit 2 ;; esac
 APP="$PWD/.build/$TEST_SUITE.app"
 mkdir -p "$APP/Contents/MacOS"
 clang -fobjc-arc -O2 -I "$RIME/include" -c Sources/RimeBridge.m -o .build/RimeBridge.o

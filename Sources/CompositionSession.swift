@@ -28,7 +28,15 @@ final class CompositionSession {
     private var initializedEditor = false
     var buffersText: Bool { translateEnabled || retainsDraft }
     var onInsert: ((String)->Void)?
+    var onConfirmedDraft: ((String)->Void)?
+    var onContextInvalidated: ((String)->Void)?
     var onUpdate: (()->Void)?
+    var contextActive: Bool { !asciiMode && !isInEditor && translation == nil && !isTranslating && errorMessage == nil && engine.contextActive }
+    func setContext(_ prefix:String?) { engine.setContext(prefix) }
+    func invalidateContext(_ reason:String,preserveHighlight:Bool = false) {
+        engine.setContext(nil,preserveHighlight:preserveHighlight); snapshot = engine.snapshot()
+        onContextInvalidated?(reason)
+    }
     var configuration: ()->ModelConfiguration = { ConfigurationStore.shared.model }
     var readKey: (String)throws->String = { try SecureKeyStore.read(endpoint:$0) }
     private var task: Task<Void,Never>?
@@ -42,6 +50,7 @@ final class CompositionSession {
     var markedCaret: Int { hasPendingInput ? draftSelection.location + snapshot.caret : draftSelection.location }
     var pendingTextStart: Int { draftSelection.location }
     func beginEditor() {
+        invalidateContext("editor")
         retainsDraft = true; isInEditor = true
         if !initializedEditor {
             editorAction = ConfigurationStore.shared.actions.first { $0.id == ConfigurationStore.shared.selectedActionID } ?? AIAction.presets[0]
@@ -52,6 +61,7 @@ final class CompositionSession {
     func endEditor() { isInEditor = false; onUpdate?() }
     func setDraftSelection(_ range:NSRange) {
         guard !hasPendingInput else { return }
+        if range != draftSelection { invalidateContext("draft-selection") }
         let length = draft.utf16.count, start = min(max(0,range.location),draft.utf16.count)
         draftSelection = NSRange(location:start,length:min(range.length,length-start))
     }
@@ -193,6 +203,7 @@ final class CompositionSession {
     var highlighted: Int { translation == nil ? snapshot.highlighted : selected }
     func setASCIIMode(_ value: Bool) {
         guard value != asciiMode else { return }
+        invalidateContext("language-mode")
         invalidateTranslation()
         commitRawInput()
         asciiMode = value
@@ -210,13 +221,15 @@ final class CompositionSession {
     }
     func setTranslateEnabled(_ value: Bool) {
         guard value != translateEnabled else { return }
-        flushOriginal(); translateEnabled = value; ConfigurationStore.shared.translateEnabled = value; onUpdate?()
+        flushOriginal(); invalidateContext("translation-mode")
+        translateEnabled = value; ConfigurationStore.shared.translateEnabled = value; onUpdate?()
     }
     func invalidateTranslation() {
         revision += 1; task?.cancel(); task = nil; isTranslating = false; translation = nil; errorMessage = nil; selected = 0
     }
     func configurationChanged() { cached = nil; invalidateTranslation(); onUpdate?() }
     func requestPinyinLayout(_ layout: PinyinLayout) throws {
+        if layout != engine.layout { invalidateContext("pinyin-layout") }
         if layout == engine.layout { nextEngine = nil }
         else if nextEngine?.layout != layout { nextEngine = try PinyinEngine(layout:layout) }
         applyPendingPinyinLayout()
@@ -231,7 +244,7 @@ final class CompositionSession {
     private func consume(_ state: PinyinSnapshot) {
         snapshot = state; snapshot.commit = ""
         if !state.commit.isEmpty {
-            if buffersText { appendToDraft(state.commit) }
+            if buffersText { appendToDraft(state.commit); onConfirmedDraft?(state.commit) }
             else { onInsert?(state.commit) }
         }
         applyPendingPinyinLayout()
@@ -292,6 +305,16 @@ final class CompositionSession {
     @discardableResult
     func handle(key: Int, control: Bool = false, shift: Bool = false, command: Bool = false, option: Bool = false) -> Bool {
         applyPendingPinyinLayout()
+        if command || control || option || [0xff08,0xffff,0xff1b,0xff09,0xff50,0xff57].contains(key) {
+            // A host shortcut may immediately commit this composition. Keep
+            // the displayed word selected even as ordinary ordering returns.
+            invalidateContext("editing-or-shortcut",preserveHighlight:true)
+        } else if [0xff51,0xff53,0xff52,0xff54].contains(key) &&
+                    (shift || !hasPendingInput || snapshot.caret != snapshot.preedit.utf16.count ||
+                     (key == 0xff51 && highlighted == 0 && snapshot.page == 0)) {
+            if key == 0xff51 && highlighted == 0 && snapshot.page == 0 { engine.prepareForCaretNavigation() }
+            invalidateContext("caret-navigation")
+        }
         if control && shift && !command && !option && (key == 101 || key == 69) { setTranslateEnabled(!translateEnabled); return true }
         if control && !shift && !command && !option && key == 0xff0d && buffersText { requestTranslation(); return true }
         if command || control || option { return false }

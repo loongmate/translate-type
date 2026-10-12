@@ -7,6 +7,7 @@ final class TextClient: NSObject, IMKTextInput {
     var identity: String
     var bundleID: String
     var generatesIdentity = false
+    var reportsMarkedSelection = false
     var selectionOverride: NSRange?
     var lengthOverride: Int?
     var markedOverride: NSRange?
@@ -38,7 +39,7 @@ final class TextClient: NSObject, IMKTextInput {
         let changes = pendingChanges; pendingChanges.removeAll()
         changes.forEach { $0() }
     }
-    func selectedRange() -> NSRange { selectionOverride ?? text.selectedRange() }
+    func selectedRange() -> NSRange { selectionOverride ?? (reportsMarkedSelection && text.hasMarkedText() ? text.markedRange() : text.selectedRange()) }
     func markedRange() -> NSRange { markedOverride ?? text.markedRange() }
     func attributedSubstring(from range: NSRange) -> NSAttributedString! { substringUnavailable ? nil : text.attributedSubstring(forProposedRange:range,actualRange:nil) }
     func length() -> Int { lengthQueries += 1; return lengthOverride ?? text.string.utf16.count }

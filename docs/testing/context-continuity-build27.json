@@ -1,0 +1,693 @@
+{
+  "build": 27,
+  "scope": "Owned AppKit and WKWebView fixtures. Continuous fixed keys enter the full input controller through a diagnostic-only, owned-host-only endpoint and use real cross-process IMK clients. This does not test physical keyboard dispatch or the Codex chat editor.",
+  "matched": 27,
+  "total": 27,
+  "results": [
+    {
+      "case": "native-committed-shang",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.1848959838971496,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-longer-context",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            2,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            2
+          ],
+          "utf16Length": 2,
+          "milliseconds": 0.8343030058313161,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-middle-caret",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            4,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            4
+          ],
+          "utf16Length": 4,
+          "milliseconds": 2.0244460029061884,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-selection",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            2
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.976222003577277,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-field-switch-same-caret",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.9826169882435352,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-return-first-field",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 2.148345985915512,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-exclude-pinyin",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": true,
+          "selection": [
+            1,
+            1
+          ],
+          "marked": [
+            1,
+            1
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.895572990179062,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "native-delete-all",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "empty-prefix",
+          "hasComposition": false,
+          "selection": [
+            0,
+            0
+          ],
+          "marked": [
+            1,
+            0
+          ],
+          "range": [
+            0,
+            0
+          ],
+          "utf16Length": 0,
+          "milliseconds": 1.3188209850341082,
+          "contextActive": false,
+          "contextDirty": true,
+          "contextReason": "editing-or-shortcut"
+        }
+      ]
+    },
+    {
+      "case": "native-multiline-emoji",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            7,
+            0
+          ],
+          "marked": [
+            1,
+            0
+          ],
+          "range": [
+            0,
+            7
+          ],
+          "utf16Length": 7,
+          "milliseconds": 1.5416880196426064,
+          "contextActive": false,
+          "contextDirty": true,
+          "contextReason": "editing-or-shortcut"
+        }
+      ]
+    },
+    {
+      "case": "native-bounded-long-text",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            201,
+            0
+          ],
+          "marked": [
+            1,
+            0
+          ],
+          "range": [
+            137,
+            64
+          ],
+          "utf16Length": 64,
+          "milliseconds": 1.0632159828674048,
+          "contextActive": false,
+          "contextDirty": true,
+          "contextReason": "editing-or-shortcut"
+        }
+      ]
+    },
+    {
+      "case": "web-input",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 3.488809015834704,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-textarea",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            2,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            2
+          ],
+          "utf16Length": 2,
+          "milliseconds": 3.4951989946421236,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-middle-caret",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            4,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            4
+          ],
+          "utf16Length": 4,
+          "milliseconds": 3.190096002072096,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-selection",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            2
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 3.196684003341943,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-other-field-same-caret",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 2.83363601192832,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-contenteditable",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 2.982669015182182,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-rich-middle",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            4,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            4
+          ],
+          "utf16Length": 4,
+          "milliseconds": 3.3224340004380792,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-rich-selection",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            2
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 3.75318800797686,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "web-rich-multiline-emoji",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            7,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            7
+          ],
+          "utf16Length": 7,
+          "milliseconds": 3.4773650113493204,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "flow-native-start",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "empty-prefix",
+          "hasComposition": false,
+          "selection": [
+            0,
+            0
+          ],
+          "marked": [
+            1,
+            0
+          ],
+          "range": [
+            0,
+            0
+          ],
+          "utf16Length": 0,
+          "milliseconds": 1.0655219957698137,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "flow-native-confirmed",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.6534189926460385,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "awaiting-confirmation"
+        }
+      ]
+    },
+    {
+      "case": "flow-native-context-active",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": true,
+          "selection": [
+            1,
+            3
+          ],
+          "marked": [
+            1,
+            3
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 1.9711060158442706,
+          "contextActive": true,
+          "contextDirty": false,
+          "contextReason": "continuous-input"
+        }
+      ]
+    },
+    {
+      "case": "flow-native-insert",
+      "result": "MATCH",
+      "observations": []
+    },
+    {
+      "case": "flow-web-start",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "empty-prefix",
+          "hasComposition": false,
+          "selection": [
+            0,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            0
+          ],
+          "utf16Length": 0,
+          "milliseconds": 2.328645990928635,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "new-focus"
+        }
+      ]
+    },
+    {
+      "case": "flow-web-confirmed",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": false,
+          "selection": [
+            1,
+            0
+          ],
+          "marked": [
+            9223372036854775807,
+            9223372036854775807
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 2.273852995131165,
+          "contextActive": false,
+          "contextDirty": false,
+          "contextReason": "awaiting-confirmation"
+        }
+      ]
+    },
+    {
+      "case": "flow-web-context-active",
+      "result": "MATCH",
+      "observations": [
+        {
+          "status": "string-range",
+          "hasComposition": true,
+          "selection": [
+            1,
+            3
+          ],
+          "marked": [
+            1,
+            3
+          ],
+          "range": [
+            0,
+            1
+          ],
+          "utf16Length": 1,
+          "milliseconds": 3.400276997126639,
+          "contextActive": true,
+          "contextDirty": false,
+          "contextReason": "continuous-input"
+        }
+      ]
+    },
+    {
+      "case": "flow-web-insert",
+      "result": "MATCH",
+      "observations": []
+    }
+  ]
+}

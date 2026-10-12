@@ -55,6 +55,15 @@ bool TTProcessKey(uintptr_t s, int k, int m) {
     return api->process_key(s, k, m);
 }
 bool TTSelectCandidate(uintptr_t s, int i) { return s && api->select_candidate_on_current_page(s, i); }
+bool TTHighlightCandidate(uintptr_t s, int i) {
+    if (!s || i < 0) return false;
+    RIME_STRUCT(RimeContext, context);
+    if (!api->get_context(s, &context)) return false;
+    size_t index = context.menu.page_no * context.menu.page_size + i;
+    BOOL valid = i < context.menu.num_candidates;
+    api->free_context(&context);
+    return valid && api->highlight_candidate(s, index);
+}
 void TTCommitComposition(uintptr_t s) { if (s) api->commit_composition(s); }
 void TTClearComposition(uintptr_t s) { if (s) api->clear_composition(s); }
 static NSString *str(const char *s) { return s ? [NSString stringWithUTF8String:s] ?: @"" : @""; }

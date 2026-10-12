@@ -12,7 +12,7 @@ enum ContextProbe {
         guard let i = CommandLine.arguments.firstIndex(of:"--context-probe"), CommandLine.arguments.count > i+1 else { return nil }
         return URL(fileURLWithPath:CommandLine.arguments[i+1])
     }
-    static func sample(_ notice:Notification,client:any IMKTextInput,hasComposition:Bool,session:UUID) {
+    static func sample(_ notice:Notification,client:any IMKTextInput,hasComposition:Bool,session:UUID,contextStatus:(active:Bool,dirty:Bool,reason:String)) {
         guard let file = reportURL, let request = notice.userInfo,
               let token = request["token"] as? String, token.count < 100,
               let expectedBundle = request["bundle"] as? String,
@@ -24,6 +24,9 @@ enum ContextProbe {
             "status":snapshot.status,"hasComposition":hasComposition,"selection":[snapshot.selection.location,snapshot.selection.length],
             "marked":[snapshot.marked.location,snapshot.marked.length],
             "milliseconds":(ProcessInfo.processInfo.systemUptime-start)*1000]
+        row["contextActive"] = contextStatus.active
+        row["contextDirty"] = contextStatus.dirty
+        row["contextReason"] = contextStatus.reason
         if let text = snapshot.prefix {
             row["sha256"] = SHA256.hash(data:Data(text.utf8)).map { String(format:"%02x",$0) }.joined()
             row["utf16Length"] = text.utf16.count

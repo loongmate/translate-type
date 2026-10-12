@@ -10,6 +10,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0"><dict><key>CFBundleExecutable</key><string>ContextHostProbe</string><key>CFBundleIdentifier</key><string>com.fangcun.ContextHostProbe</string><key>CFBundleName</key><string>方寸上下文验证</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>
 PLIST
 codesign --force --sign - "$APP"
+if [ "${1:-}" = --self-check ]; then
+    exec "$APP/Contents/MacOS/ContextHostProbe" "$PWD/.build/context-samples.jsonl" "$PWD/.build/context-host-results.json" --self-check
+fi
 PREVIOUS=$(./scripts/input-sources.sh current)
 trap './scripts/input-sources.sh select "$PREVIOUS" || true' EXIT
-"$APP/Contents/MacOS/ContextHostProbe" "$PWD/.build/context-samples.jsonl" "$PWD/.build/context-host-results.json"
+"$APP/Contents/MacOS/ContextHostProbe" "$PWD/.build/context-samples.jsonl" "$PWD/.build/context-host-results.json" "$@"
