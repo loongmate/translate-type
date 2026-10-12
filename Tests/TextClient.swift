@@ -11,6 +11,9 @@ final class TextClient: NSObject, IMKTextInput {
     var lengthOverride: Int?
     var markedOverride: NSRange?
     var substringUnavailable = false
+    var stringHandler: ((NSRange,inout NSRange)->String?)?
+    var contextReadHook: (() -> Void)?
+    var lengthQueries = 0
     var deferEmptyChanges = false
     var canDeliverInsertion: (() -> Bool)?
     private var pendingChanges: [() -> Void] = []
@@ -38,7 +41,7 @@ final class TextClient: NSObject, IMKTextInput {
     func selectedRange() -> NSRange { selectionOverride ?? text.selectedRange() }
     func markedRange() -> NSRange { markedOverride ?? text.markedRange() }
     func attributedSubstring(from range: NSRange) -> NSAttributedString! { substringUnavailable ? nil : text.attributedSubstring(forProposedRange:range,actualRange:nil) }
-    func length() -> Int { lengthOverride ?? text.string.utf16.count }
+    func length() -> Int { lengthQueries += 1; return lengthOverride ?? text.string.utf16.count }
     func characterIndex(for point:NSPoint, tracking:IMKLocationToOffsetMappingMode, inMarkedRange:UnsafeMutablePointer<ObjCBool>!) -> Int { 0 }
     func attributes(forCharacterIndex index:Int, lineHeightRectangle rect:UnsafeMutablePointer<NSRect>!) -> [AnyHashable:Any]! { rect.pointee = NSRect(x:100,y:300,width:1,height:20); return [:] }
     func validAttributesForMarkedText() -> [Any]! { [] }
@@ -49,6 +52,11 @@ final class TextClient: NSObject, IMKTextInput {
     func windowLevel() -> CGWindowLevel { 0 }
     func supportsProperty(_ property:TSMDocumentPropertyTag) -> Bool { false }
     func uniqueClientIdentifierString() -> String! { generatesIdentity ? ProcessInfo.processInfo.globallyUniqueString : identity }
-    func string(from range:NSRange, actualRange:UnsafeMutablePointer<NSRange>!) -> String! { text.string }
+    func string(from range:NSRange, actualRange:UnsafeMutablePointer<NSRange>!) -> String! {
+        defer { contextReadHook?() }
+        if let stringHandler { return stringHandler(range,&actualRange.pointee) }
+        guard !substringUnavailable else { return nil }
+        return text.attributedSubstring(forProposedRange:range,actualRange:actualRange)?.string
+    }
     func firstRect(forCharacterRange range:NSRange, actualRange:UnsafeMutablePointer<NSRange>!) -> NSRect { .zero }
 }

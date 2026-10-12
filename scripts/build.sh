@@ -12,6 +12,8 @@ MIN_MACOS="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resource
 # Local builds keep their host architecture. Distribution builds opt in to both.
 read -r -a ARCHS <<< "${FANGCUN_ARCHS:-$(uname -m)}"
 BINARIES=()
+SWIFT_FLAGS=(-swift-version 5)
+if [ "${FANGCUN_CONTEXT_PROBE:-0}" = 1 ]; then SWIFT_FLAGS+=(-D CONTEXT_PROBE); fi
 mkdir -p .build "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 if [ ! -f "$RIME/include/rime_api.h" ] || [ ! -s Resources/pinyin_simp.dict.yaml ]; then
     echo '请先运行 scripts/bootstrap.sh 下载拼音引擎和词库。' >&2
@@ -27,7 +29,7 @@ for ARCH in "${ARCHS[@]}"; do
     mkdir -p "$OUTPUT"
     clang -target "$ARCH-apple-macos$MIN_MACOS" -isysroot "$SDK" -fobjc-arc -O2 \
         -I "$RIME/include" -c Sources/RimeBridge.m -o "$OUTPUT/RimeBridge.o"
-    swiftc -target "$ARCH-apple-macosx$MIN_MACOS" -sdk "$SDK" -swift-version 5 -O -module-name TranslateType \
+    swiftc "${SWIFT_FLAGS[@]}" -target "$ARCH-apple-macosx$MIN_MACOS" -sdk "$SDK" -O -module-name TranslateType \
         -import-objc-header Sources/RimeBridge.h Sources/*.swift "$OUTPUT/RimeBridge.o" \
         -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon -framework Security \
         -Xlinker -rpath -Xlinker @executable_path/../Frameworks -o "$OUTPUT/TranslateType"

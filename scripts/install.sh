@@ -47,7 +47,11 @@ for PREVIOUS in "$HOME/Library/Input Methods/方寸输入法.app" "$HOME/Library
         mv "$PREVIOUS" "$PWD/.build/$(basename "$PREVIOUS" .app)-retired-$STAMP.snapshot"
     fi
 done
-open -a "$DESTINATION" --args --settings
+if [ "${FANGCUN_OPEN_SETTINGS:-1}" = 1 ]; then
+    open -a "$DESTINATION" --args --settings
+else
+    open -a "$DESTINATION"
+fi
 if [[ "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.Hans' || "$PREVIOUS_SOURCE" = 'com.translatetype.inputmethod.TranslateType.English' ]]; then
     # After restarting return to the normal Chinese entry, ready for Shift.
     ./scripts/input-sources.sh select "$RESTORE_SOURCE"

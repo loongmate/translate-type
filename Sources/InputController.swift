@@ -71,6 +71,11 @@ final class TTInputController: IMKInputController {
         // already creates the session. Observers still belong to this controller.
         if !observingChanges {
             observingChanges = true
+#if CONTEXT_PROBE
+            if ContextProbe.reportURL != nil {
+                DistributedNotificationCenter.default().addObserver(self,selector:#selector(sampleContext(_:)),name:ContextProbe.notification,object:nil)
+            }
+#endif
             NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
             NotificationCenter.default.addObserver(self,selector:#selector(pinyinLayoutChanged),name:.pinyinLayoutChanged,object:nil)
             DistributedNotificationCenter.default().addObserver(self,selector:#selector(inputSourceChanged),name:Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),object:nil)
@@ -150,6 +155,22 @@ final class TTInputController: IMKInputController {
         panel.show(session:session,anchor:rect,expand:{ [weak self] in self?.openEditor() },ask:{ [weak self] in self?.openAIQuestion() }) { SettingsWindow.shared.show() }
     }
     deinit { NotificationCenter.default.removeObserver(self); DistributedNotificationCenter.default().removeObserver(self) }
+#if CONTEXT_PROBE
+    @objc private func sampleContext(_ notice:Notification) {
+        guard isActive, let client = activeClient else { return }
+        // Exercise a real Rime composition only in the owned test host, never
+        // in a user application. These are not global/synthetic keyboard events.
+        if let action = notice.userInfo?["fixtureAction"] as? String,
+           notice.userInfo?["bundle"] as? String == "com.fangcun.ContextHostProbe",
+           client.bundleIdentifier() == "com.fangcun.ContextHostProbe",
+           NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.fangcun.ContextHostProbe" {
+            if action == "begin-pinyin" { _ = session?.handle(key:104) }
+            if action == "cancel-pinyin" { _ = session?.handle(key:0xff1b) }
+            return
+        }
+        ContextProbe.sample(notice,client:client,hasComposition:session?.markedText.isEmpty == false,session:inputSessionID)
+    }
+#endif
     nonisolated override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         guard tag == Int(kTextServiceInputModePropertyTag), let mode = value as? String,
               InputSourceStatus.isOurMode(mode) else { super.setValue(value,forTag:tag,client:sender); return }

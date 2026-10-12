@@ -63,6 +63,8 @@ API Key 按服务地址分别保存在 macOS 钥匙串，普通配置存入应�
 
 ## 验证
 
+build 26 加入已上屏上下文的读取与验证工具，尚未启用候选重排。原生 AppKit / WebKit 固定场景的跨进程读取 19 项匹配，读取边界检查 24 项通过；正式构建不包含诊断监听器。宿主兼容性边界和「上 + hai」的排序设计见 [上下文候选能力验证](docs/context-aware-candidates.md)。
+
 build 25 修正 build 24 将英文模式对系统界面隐藏的配置；中文和英文使用同一输入法的两个可见模式及各自图标，仍只有一个系统菜单栏位置。`./scripts/mode-icon-test.sh` 检查模式、图标文件和菜单栏的辅助功能描述；没有辅助功能权限时明确跳过界面检查。它不检查菜单栏像素。详见 [中英文图标验收更正](docs/testing/mode-icon-build25.md)。
 
 build 23 修复临时编辑区保留草稿时，回到原输入框先按 Shift 无法切英文的问题，并兼容重复的 Shift 修饰键通知。详见 [Shift 切换回归](docs/testing/shift-switch-build23.md)。
