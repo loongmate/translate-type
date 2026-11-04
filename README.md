@@ -9,7 +9,7 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 - [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.2/FangCun-0.1.0-build42-AppleSilicon-preview.dmg)
 - [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.2/FangCun-0.1.0-build42-Intel-preview.dmg)
 
-打开 DMG 后，将 `FangCun.app` 复制到 `~/Library/Input Methods/`，再打开已安装的应用；不要拖入「应用程序」文件夹。应用、Rime 动态库和 DMG 已有 Developer ID 正式签名，Apple 公证尚未完成，首次打开可能需要在「系统设置 → 隐私与安全性」中点击「仍要打开」。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.2.md)。
+打开 DMG 后，将 `FangCun.app` 复制到 `~/Library/Input Methods/`，再打开已安装的应用；不要拖入「应用程序」文件夹。应用、Rime 动态库和 DMG 已有 Developer ID 正式签名；两种架构的应用与 DMG 均已通过 Apple 公证并附加票据。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.2.md)。
 
 ## 本机构建和安装
 

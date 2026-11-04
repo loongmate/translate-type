@@ -37,4 +37,17 @@ Apple Silicon 通过交叉编译和包检查，尚未真机运行；macOS 13、�
 
 复制既有测试程序，将 Rime 放入应用 Frameworks 并调整 rpath，使用同一 Developer ID、Hardened Runtime 和权限签名，按每个 suite 独立 mock 服务运行：EditorTests 160 项、CandidateActionTests 32 项、AgentTests 40 项、ScratchpadTests 41 项均通过，覆盖输入、上屏交接、本机命令和文件工具、JavaScriptCore Markdown 及 WebKit 预览。测试日志保存在本机 `.build/signed-smoke-*.log`。
 
-公证尚未完成，未声明 Gatekeeper 首次安装验收通过。签名后 DMG 摘要以发布说明及同名 `.sha256` 为准。
+正式签名后的公证更新见下文。完整的新账户首次安装流程仍待验收。
+
+## 同日 Apple 公证更新
+
+复用同一 Apple Developer 团队的既有本机公证凭据，未重新申请证书。四份提交均为 Accepted，Apple 报告的 issues 均为空：
+
+| 架构 | 提交物 | 公证提交 ID |
+| --- | --- | --- |
+| AppleSilicon | app | `5f8c5baf-39bc-408c-91ec-bc2d3768eca5` |
+| AppleSilicon | dmg | `39d9ff19-9212-48e2-b69a-867f0c66dcfd` |
+| Intel | app | `7eefd25f-2781-40d9-872b-615dbc25f539` |
+| Intel | dmg | `7ffb175d-9482-44cd-bd98-82c78fb5c2e2` |
+
+两份最终 DMG 及挂载后的应用均通过 `stapler validate`，Gatekeeper 的执行／打开评估均返回 `Notarized Developer ID`。最终映像完整性、严格签名、版本、架构、资源、权限、包内说明和 SHA-256 再次通过验证。公证报告和验证日志留在本机 `.build/`，未将公证凭据写入源码。

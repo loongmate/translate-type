@@ -8,7 +8,7 @@ FANGCUN_SIGN_ID='Developer ID Application: Your Name (TEAMID)' ./scripts/package
 # 已配置 notarytool 钥匙串凭据后，也可设置 FANGCUN_NOTARY_PROFILE 完成公证。
 ```
 
-输出 `dist/FangCun-0.1.0-build42-{AppleSilicon,Intel}-preview.dmg` 及各自的 `.sha256`。DMG 内是对应架构的应用和手动安装说明，可通过 `FANGCUN_SIGN_ID` 启用 Developer ID 正式签名，通过 `FANGCUN_NOTARY_PROFILE` 使用已存储的公证凭据；本次正式签名包尚未完成公证；安装目录为 `~/Library/Input Methods/`。当前凭据存储等行为以本次发布说明为准。以下保留首版发布调查与正式安装器规划，反映当时的版本和环境。
+输出 `dist/FangCun-0.1.0-build42-{AppleSilicon,Intel}-preview.dmg` 及各自的 `.sha256`。DMG 内是对应架构的应用和手动安装说明，可通过 `FANGCUN_SIGN_ID` 启用 Developer ID 正式签名，通过 `FANGCUN_NOTARY_PROFILE` 使用已存储的公证凭据；本次应用和 DMG 均已完成正式签名、公证及票据附加；安装目录为 `~/Library/Input Methods/`。当前凭据存储等行为以本次发布说明为准。以下保留首版发布调查与正式安装器规划，反映当时的版本和环境。
 
 调查日期：2026-10-11。第一版按预览版发布到 GitHub Releases，分别提供 **Apple Silicon 版（M 系列芯片）** 和 **Intel 版**，版本为 `0.1.0-beta.1`。本版保留开发签名，Developer ID 和 Apple 公证后续补齐；用户在系统设置中为该应用确认“仍要打开”。下载与安装说明见 [预览版发布说明](releases/v0.1.0-beta.1.md)。
 
