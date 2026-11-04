@@ -8,5 +8,7 @@ bool TTSelectCandidate(uintptr_t session, int index);
 bool TTHighlightCandidate(uintptr_t session, int index);
 void TTCommitComposition(uintptr_t session);
 void TTClearComposition(uintptr_t session);
+// Move to the raw input end, returning the previous caret in UTF-16 units.
+int TTMoveCaretToEnd(uintptr_t session);
 char *TTSnapshot(uintptr_t session);
 void TTFreeString(char *text);

@@ -73,6 +73,13 @@ static NSUInteger textOffset(const char *text, int byteOffset) {
     size_t count = MIN((size_t)byteOffset, strlen(text));
     return [[NSString alloc] initWithBytes:text length:count encoding:NSUTF8StringEncoding].length;
 }
+int TTMoveCaretToEnd(uintptr_t s) {
+    if (!s || !api) return 0;
+    const char *input = api->get_input(s);
+    int previous = (int)textOffset(input, (int)api->get_caret_pos(s));
+    api->set_caret_pos(s, input ? strlen(input) : 0);
+    return previous;
+}
 char *TTSnapshot(uintptr_t s) {
     RIME_STRUCT(RimeContext, context);
     NSMutableArray *candidates = [NSMutableArray array];

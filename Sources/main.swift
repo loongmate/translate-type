@@ -5,6 +5,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
             if let url = Bundle.main.url(forResource:"AppIcon",withExtension:"icns"), let icon = NSImage(contentsOf:url) { NSApp.applicationIconImage = icon }
+            // Local credential diagnostics never send text or expose a key.
+            if let index = CommandLine.arguments.firstIndex(of:"--credential-probe"), CommandLine.arguments.count > index+1 {
+                let report = URL(fileURLWithPath:CommandLine.arguments[index+1])
+                Task { @MainActor in
+                    let started = Date()
+                    var result: [String:Any]
+                    do {
+                        let key = try await APIKeyStore.shared.read(endpoint:ConfigurationStore.shared.model.endpoint)
+                        result = ["success":true,"hasKey":!key.isEmpty]
+                    } catch { result = ["success":false,"error":error.localizedDescription] }
+                    result["seconds"] = Date().timeIntervalSince(started)
+                    try? JSONSerialization.data(withJSONObject:result,options:[.prettyPrinted,.sortedKeys]).write(to:report,options:.atomic)
+                    NSApp.terminate(nil)
+                }
+                return
+            }
             // Explicit local verification only: fixed public sample texts,
             // never read a user's draft, clipboard or surrounding document.
             if let index = CommandLine.arguments.firstIndex(of:"--ai-actions-probe"), CommandLine.arguments.count > index+1 {
@@ -13,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     var results: [[String:Any]] = []
                     do {
                         let config = ConfigurationStore.shared.model
-                        let key = try SecureKeyStore.read(endpoint:config.endpoint)
+                        let key = try await APIKeyStore.shared.read(endpoint:config.endpoint)
                         let samples = [
                             ("german",AIAction.presets[1].instruction(configuration:config),"这周六下午三点见。"),
                             ("ask","你是文字助手，直接回答问题，不输出思考过程。","请用中文列出三个轻松的周末活动，每项一行。")
@@ -36,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     var result: [String:Any]
                     do {
                         let config = ConfigurationStore.shared.model
-                        let key = try SecureKeyStore.read(endpoint:config.endpoint)
+                        let key = try await APIKeyStore.shared.read(endpoint:config.endpoint)
                         let translated = try await TranslationClient().perform("周末去海边走走吧",configuration:config,apiKey:key)
                         result = ["success":true,"seconds":Date().timeIntervalSince(started),"hasReasoning":translated.hasReasoning,"translation":translated.text]
                     } catch { result = ["success":false,"error":error.localizedDescription] }

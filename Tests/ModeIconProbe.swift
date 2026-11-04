@@ -12,8 +12,8 @@ import ApplicationServices
     private var previous: String?
     private var report = ""
     private var menuChecks = 0
+    private var indicatorChecks = 0
     private let chinese = "com.translatetype.inputmethod.TranslateType.Hans"
-    private let english = "com.translatetype.inputmethod.TranslateType.English"
     private func log(_ message:String) { report += message + "\n" }
     private func finish(_ message:String) {
         log(message)
@@ -31,7 +31,7 @@ import ApplicationServices
         NSApp.activate(ignoringOtherApps:true)
         Task { @MainActor in
             do {
-                try await wait(1)
+                try await wait(0.3)
                 if !hasFocus {
                     window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
                     window.makeFirstResponder(text); try await wait(0.5)
@@ -45,13 +45,13 @@ import ApplicationServices
                 try await wait(1.2)
                 guard checkMode(chinese,icon:"InputMenuIcon-v6.pdf") else { return }
                 guard shift(true) else { return }; try await wait(0.08); guard shift(false) else { return }
-                try await wait(1)
-                guard checkMode(english,icon:"InputMenuEnglish-v1.pdf") else { return }
+                try await wait(0.2)
+                guard checkMode(chinese,icon:"InputMenuIcon-v6.pdf",asciiMode:true) else { return }
                 guard shift(true) else { return }; try await wait(0.08); guard shift(false) else { return }
-                try await wait(1)
+                try await wait(0.2)
                 guard checkMode(chinese,icon:"InputMenuIcon-v6.pdf") else { return }
-                log("MENU BAR ACCESSIBILITY: \(menuChecks)/3 states checked; pixels not captured")
-                finish("MODE ICON METADATA PASSED: 方 → 英 → 方 (menu-bar pixels not checked)")
+                log("MENU BAR ACCESSIBILITY: native \(menuChecks)/3, language indicator \(indicatorChecks)/3; pixels not captured")
+                finish("MODE ICON METADATA PASSED: 单一输入源，附加状态图标 中 → 英 → 中 (input text and menu-bar pixels not checked)")
             } catch { finish("FAIL: \(error.localizedDescription)") }
         }
     }
@@ -62,16 +62,52 @@ import ApplicationServices
         guard let pointer = TISGetInputSourceProperty(source,key) else { return nil }
         return Unmanaged<CFString>.fromOpaque(pointer).takeUnretainedValue() as String
     }
-    private func checkMode(_ mode:String,icon:String) -> Bool {
-        guard hasFocus else { finish("FAIL: 验证中窗口失焦"); return false }
+    private func checkMode(_ mode:String,icon:String,asciiMode:Bool = false) -> Bool {
+        guard hasFocus else { finish("FAIL: 验证中窗口失焦（active=\(NSApp.isActive), key=\(window.isKeyWindow), responder=\(window.firstResponder === text)）"); return false }
         let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         guard property(kTISPropertyInputSourceID) == mode,
               let pointer = TISGetInputSourceProperty(source,kTISPropertyIconImageURL),
               (Unmanaged<CFURL>.fromOpaque(pointer).takeUnretainedValue() as URL).lastPathComponent == icon else {
-            finish("FAIL: 系统当前模式或图标未更新为 \(mode)"); return false
+            finish("FAIL: 系统当前模式或图标未更新为 \(mode) / \(icon)"); return false
         }
         log("PASS: \(mode) / \(icon)")
-        return checkMenu(mode)
+        let sources = TISCreateInputSourceList(nil,false).takeRetainedValue() as! [TISInputSource]
+        let entries = sources.filter { source in
+            guard let pointer = TISGetInputSourceProperty(source,kTISPropertyInputSourceID),
+                  let capable = TISGetInputSourceProperty(source,kTISPropertyInputSourceIsSelectCapable) else { return false }
+            let id = Unmanaged<CFString>.fromOpaque(pointer).takeUnretainedValue() as String
+            return id.hasPrefix("com.translatetype.inputmethod.TranslateType.") && CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(capable).takeUnretainedValue())
+        }
+        guard entries.count == 1 else { finish("FAIL: 方寸可选入口有 \(entries.count) 个"); return false }
+        log("PASS: 系统只有一个启用且可选的方寸入口")
+        return checkMenu(mode) && checkIndicator(asciiMode:asciiMode)
+    }
+    private func checkIndicator(asciiMode:Bool) -> Bool {
+        guard AXIsProcessTrusted() else { log("SKIP: Language indicator accessibility not permitted"); return true }
+        guard let ime = NSWorkspace.shared.runningApplications.first(where:{$0.bundleIdentifier == "com.translatetype.inputmethod.TranslateType"}) else {
+            finish("FAIL: 输入法进程不可用"); return false
+        }
+        func attribute(_ element:AXUIElement,_ key:String) -> CFTypeRef? {
+            var value:CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element,key as CFString,&value) == .success else { return nil }
+            return value
+        }
+        let app = AXUIElementCreateApplication(ime.processIdentifier)
+        var bars = (attribute(app,kAXChildrenAttribute) as? [AXUIElement] ?? []).filter {
+            attribute($0,kAXRoleAttribute) as? String == kAXMenuBarRole
+        }
+        if let extras = attribute(app,kAXExtrasMenuBarAttribute) { bars.append(extras as! AXUIElement) }
+        let items = bars.flatMap { attribute($0,kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+        let labels = items.flatMap { element in
+            [kAXDescriptionAttribute,kAXTitleAttribute].compactMap { attribute(element,$0) as? String }
+        }
+        let expected = "方寸语言状态 · \(asciiMode ? "英文" : "中文")"
+        guard labels.contains(expected) else {
+            finish("FAIL: 状态图标预期 \(expected)，实际 \(labels)"); return false
+        }
+        indicatorChecks += 1
+        log("PASS: language indicator = \(expected)")
+        return true
     }
     private func checkMenu(_ mode:String) -> Bool {
         guard AXIsProcessTrusted() else { log("SKIP: Menu-bar accessibility not permitted"); return true }
@@ -89,7 +125,7 @@ import ApplicationServices
         }
         let descriptions = menuBars.flatMap { attribute($0,kAXChildrenAttribute) as? [AXUIElement] ?? [] }
             .compactMap { attribute($0,kAXDescriptionAttribute) as? String }
-        let expected = mode == english ? "方寸输入法 · 英文" : "方寸输入法"
+        let expected = "方寸输入法"
         guard descriptions.contains(expected) else {
             finish("FAIL: Menu-bar description expected \(expected), got \(descriptions)"); return false
         }
@@ -98,7 +134,8 @@ import ApplicationServices
     private func shift(_ down:Bool) -> Bool {
         guard hasFocus, let context = text.inputContext else { finish("FAIL: 验证中窗口失焦"); return false }
         let event = NSEvent.keyEvent(with:.flagsChanged,location:.zero,modifierFlags:down ? [.shift] : [],timestamp:ProcessInfo.processInfo.systemUptime,windowNumber:window.windowNumber,context:nil,characters:"",charactersIgnoringModifiers:"",isARepeat:false,keyCode:56)!
-        _ = context.handleEvent(event)
+        let handled = context.handleEvent(event)
+        log("SHIFT \(down ? "down" : "up"): handled=\(handled)")
         // The actual TIS mode/icon, not this synchronous return value, is the
         // assertion: the input method's reply can arrive asynchronously.
         return true

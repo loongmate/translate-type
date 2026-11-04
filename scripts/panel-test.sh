@@ -19,8 +19,8 @@ MOCK_PID=$!
 trap 'kill "$MOCK_PID" 2>/dev/null || true' EXIT
 clang -fobjc-arc -O2 -I "$RIME/include" -c Sources/RimeBridge.m -o .build/PanelBridge.o
 swiftc -swift-version 5 -Onone -import-objc-header Sources/RimeBridge.h \
-    Sources/Configuration.swift Sources/PinyinEngine.swift Sources/ContextRanking.swift Sources/CompositionSession.swift Sources/TranslationClient.swift Sources/CandidatePanel.swift \
+    Sources/Agent*.swift Sources/Configuration.swift Sources/PinyinEngine.swift Sources/ContextRanking.swift Sources/CompositionSession.swift Sources/TranslationClient.swift Sources/CandidatePanel.swift \
     Tests/PanelTests.swift .build/PanelBridge.o \
-    -L "$RIME/lib" -lrime -framework AppKit -framework Security \
+    -L "$RIME/lib" -lrime -framework AppKit \
     -Xlinker -rpath -Xlinker "$RIME/lib" -o "$APP/Contents/MacOS/PanelTests"
 "$APP/Contents/MacOS/PanelTests"

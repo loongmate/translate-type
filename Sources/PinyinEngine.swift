@@ -16,6 +16,9 @@ struct PinyinSnapshot: Decodable {
 final class PinyinEngine {
     private var id: UInt
     private var lastInput = ""
+    private var literalInput: String?
+    private var literalCaret = 0
+    var isLiteralInput: Bool { literalInput != nil }
     private static var contextRanking: ContextRanking?
     private var contextPrefix: String?
     private var mapping: [Int] = []
@@ -31,6 +34,7 @@ final class PinyinEngine {
     }
     deinit { TTDestroySession(id) }
     func prepareForCaretNavigation() {
+        guard !isLiteralInput else { return }
         manualHighlight = false; contextSuppressed = true
         _ = TTHighlightCandidate(id,0)
     }
@@ -44,6 +48,20 @@ final class PinyinEngine {
         }
     }
     func process(_ key: Int, modifiers: Int = 0) -> (Bool, PinyinSnapshot) {
+        if isLiteralInput { return processLiteral(key) }
+        if startsLiteralFragment(key), !lastState.input.isEmpty {
+            // Ordinary ASCII symbols never confirm a pinyin candidate. Keep confirmed Chinese
+            // segments, but retain every unconfirmed letter (including text
+            // after a moved caret) and edit the whole fragment literally.
+            let rawLength = lastState.input.utf16.count
+            let rawCaret = Int(TTMoveCaretToEnd(id))
+            _ = TTProcessKey(id, 0xff0d, 0)
+            let text = snapshot().commit
+            clear()
+            literalInput = text
+            literalCaret = min(max(0,rawCaret + text.utf16.count - rawLength),text.utf16.count)
+            return processLiteral(key)
+        }
         if lastState.input.isEmpty { contextSuppressed = false; manualHighlight = false }
         if mapping != Array(mapping.indices), !mapping.isEmpty, modifiers == 0 {
             if (49...57).contains(key), mapping.indices.contains(key-49) { return (true,select(key-49)) }
@@ -73,13 +91,67 @@ final class PinyinEngine {
         let handled = TTProcessKey(id, Int32(key), Int32(modifiers))
         return (handled, snapshot())
     }
+    private func startsLiteralFragment(_ key:Int) -> Bool {
+        let symbol = (33...47).contains(key) || (58...64).contains(key) ||
+            (91...96).contains(key) || (123...126).contains(key)
+        // These keys have explicit input-method roles. Once a literal fragment
+        // has begun, processLiteral accepts them as ordinary text instead.
+        guard symbol, ![39,43,45,61].contains(key) else { return false }
+        if key == 59 && [.sogou,.microsoft,.ziguang].contains(layout) { return false }
+        return true
+    }
     func select(_ index: Int) -> PinyinSnapshot {
+        if isLiteralInput { return index == 0 ? commit() : snapshot() }
         let native = mapping.indices.contains(index) ? mapping[index] : index
         _ = TTSelectCandidate(id,Int32(native)); return snapshot()
     }
-    func commit() -> PinyinSnapshot { TTCommitComposition(id); return snapshot() }
-    func clear() { TTClearComposition(id); lastInput = ""; mapping = []; lastState = .empty; contextActive = false }
+    func commit() -> PinyinSnapshot {
+        if let text = literalInput {
+            clear()
+            var state = PinyinSnapshot.empty; state.commit = text
+            return state
+        }
+        TTCommitComposition(id); return snapshot()
+    }
+    func clear() { TTClearComposition(id); literalInput = nil; literalCaret = 0; lastInput = ""; mapping = []; lastState = .empty; contextActive = false }
+    private func processLiteral(_ key:Int) -> (Bool,PinyinSnapshot) {
+        guard let text = literalInput else { return (false,snapshot()) }
+        let value = text as NSString
+        switch key {
+        case 32,0xff0d,0xff09: return (true,commit())
+        case 0xff08:
+            if literalCaret > 0 {
+                let range = value.rangeOfComposedCharacterSequence(at:literalCaret-1)
+                literalInput = value.replacingCharacters(in:range,with:"")
+                literalCaret = range.location
+            }
+        case 0xffff:
+            if literalCaret < value.length {
+                literalInput = value.replacingCharacters(in:value.rangeOfComposedCharacterSequence(at:literalCaret),with:"")
+            }
+        case 0xff51:
+            if literalCaret > 0 { literalCaret = value.rangeOfComposedCharacterSequence(at:literalCaret-1).location }
+        case 0xff53:
+            if literalCaret < value.length { literalCaret = NSMaxRange(value.rangeOfComposedCharacterSequence(at:literalCaret)) }
+        case 0xff50: literalCaret = 0
+        case 0xff57: literalCaret = value.length
+        case 0xff52,0xff54,0xff55,0xff56: break
+        case 0xff1b: clear(); return (true,snapshot())
+        case 33...126:
+            literalInput = value.replacingCharacters(in:NSRange(location:literalCaret,length:0),with:String(UnicodeScalar(key)!))
+            literalCaret += 1
+        default: return (false,snapshot())
+        }
+        if literalInput?.isEmpty == true { clear() }
+        return (true,snapshot())
+    }
     func snapshot() -> PinyinSnapshot {
+        if let text = literalInput {
+            contextActive = false; mapping = [0]
+            let state = PinyinSnapshot(preedit:text,input:text,preview:text,caret:literalCaret,selectionStart:0,selectionEnd:text.utf16.count,candidates:[text],highlighted:0,page:0,lastPage:true,commit:"")
+            lastState = state
+            return state
+        }
         guard let pointer = TTSnapshot(id) else { return .empty }
         defer { TTFreeString(pointer) }
         guard var state = try? JSONDecoder().decode(PinyinSnapshot.self, from:Data(String(cString:pointer).utf8)) else { return .empty }

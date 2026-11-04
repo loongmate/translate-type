@@ -5,8 +5,8 @@ enum InputSourceStatus {
     // Keep the already-enabled system identity stable across branding changes.
     static let bundleID = "com.translatetype.inputmethod.TranslateType"
     static let modeID = bundleID + ".Hans"
-    static let englishModeID = bundleID + ".English"
-    static func isOurMode(_ id:String) -> Bool { id == modeID || id == englishModeID }
+    static let retiredEnglishModeID = bundleID + ".English"
+    static func isOurMode(_ id:String) -> Bool { id == modeID }
     static let legacyBundleIDs = ["com.fangcun.inputmethod.FangCun", "com.apple.inputmethod.translatetype"]
 
     struct RegistrationError: LocalizedError {
@@ -26,7 +26,7 @@ enum InputSourceStatus {
     }
     static var currentID: String { identifier(TISCopyCurrentKeyboardInputSource().takeRetainedValue()) }
     static func isLegacy(_ id: String) -> Bool {
-        legacyBundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
+        id == retiredEnglishModeID || legacyBundleIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
     }
     static var isAvailable: Bool {
         let enabled = sources(includeDisabled: false)
@@ -44,7 +44,7 @@ enum InputSourceStatus {
     static func enable(at url: URL = Bundle.main.bundleURL, replacingCurrentID: String? = nil) throws {
         let previousID = replacingCurrentID ?? currentID
         try register(at: url)
-        for id in [bundleID, modeID, englishModeID] {
+        for id in [bundleID, modeID] {
             guard let source = sources().first(where: { identifier($0) == id }) else {
                 throw RegistrationError(message: "系统尚未识别方寸输入法，请重新登录后再添加。")
             }
@@ -56,8 +56,8 @@ enum InputSourceStatus {
         guard isAvailable else {
             throw RegistrationError(message: "macOS 未自动启用方寸输入法。请打开系统键盘设置，在「编辑 → ＋ → 简体中文」添加「方寸输入法」。旧输入法仍保留。")
         }
-        // Enable both visible native modes. IMK selects the mode of the active
-        // client, and the system input menu owns their single menu-bar indicator.
+        // English is session state within the single Chinese input source.
+        // Retire the previously enabled English entry after Hans is available.
         try finishMigration(replacingCurrentID: previousID)
     }
     static func finishMigration(replacingCurrentID: String? = nil) throws {

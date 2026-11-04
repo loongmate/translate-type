@@ -15,20 +15,33 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     private let doublePinyin = NSPopUpButton()
     private let editorShortcut = ShortcutRecorder()
     private let pinyinExample = NSTextField(wrappingLabelWithString:"")
+    private let tabs = NSTabView()
+    private let candidateActionPicker = NSPopUpButton()
+    private let candidatePrompt = NSTextView()
+    private var actionEditor: AIActionWindow?
     private var isEnablingInput = false
     private var loadedEndpoint = ""
     private var testTask: Task<Void,Never>?
     private var testButton: NSButton!
+    private var keyTask: Task<Void,Never>?
+    private var keyRevision = 0
+    private var keyLoadPending = false
+    private var keyLoadFailed = false
+    private var saveTask: Task<Void,Never>?
+    private var saveButton: NSButton!
+    private let keyStore: APIKeyStore
+    init(keyStore:APIKeyStore = .shared) { self.keyStore = keyStore; super.init() }
     func show() {
         if window == nil {
             build()
             let config = ConfigurationStore.shared.model
             endpoint.stringValue = config.endpoint; model.stringValue = config.model; instruction.string = config.instruction
             loadedEndpoint = config.endpoint
-            key.stringValue = (try? SecureKeyStore.read(endpoint:config.endpoint)) ?? ""
             status.stringValue = "留空使用默认指令。预设或修改指令不会调用模型。"
+            loadKey(endpoint:config.endpoint)
         }
         updatePinyinControls()
+        updateCandidateActions()
         updateInputStatus()
         editorShortcut.refresh()
         NSApp.setActivationPolicy(.regular)
@@ -36,8 +49,54 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
     }
+    private func loadKey(endpoint:String) {
+        keyRevision += 1; let token = keyRevision
+        keyTask?.cancel(); keyLoadPending = true; keyLoadFailed = false
+        keyTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let value = try await self.keyStore.read(endpoint:endpoint)
+                guard !Task.isCancelled, self.keyRevision == token else { return }
+                self.key.stringValue = value
+            } catch {
+                guard !Task.isCancelled, self.keyRevision == token else { return }
+                self.keyLoadFailed = true; self.status.stringValue = error.localizedDescription
+            }
+            self.keyLoadPending = false; self.keyTask = nil
+        }
+    }
+    private func cancelKeyLoad() {
+        keyRevision += 1; keyTask?.cancel(); keyTask = nil
+        keyLoadPending = false; keyLoadFailed = false
+    }
+    func showCandidateActions() {
+        show(); tabs.selectTabViewItem(withIdentifier:"候选动作")
+    }
     func windowWillClose(_ notification:Notification) { NSApp.setActivationPolicy(.accessory) }
-    func windowDidBecomeKey(_ notification:Notification) { updateInputStatus(); updatePinyinControls() }
+    func windowDidBecomeKey(_ notification:Notification) { updateInputStatus(); updatePinyinControls(); updateCandidateActions() }
+    @objc private func updateCandidateActions() {
+        let store = ConfigurationStore.shared
+        candidateActionPicker.removeAllItems()
+        for action in store.actions {
+            candidateActionPicker.addItem(withTitle:action.name)
+            candidateActionPicker.lastItem?.representedObject = action.id
+        }
+        if let item = candidateActionPicker.itemArray.first(where:{$0.representedObject as? String == store.candidateActionID}) { candidateActionPicker.select(item) }
+        candidatePrompt.string = store.candidateAction.instruction(configuration:store.model)
+    }
+    @objc private func changeCandidateAction() {
+        guard let id = candidateActionPicker.selectedItem?.representedObject as? String else { return }
+        ConfigurationStore.shared.candidateActionID = id
+    }
+    @objc private func newCandidateAction() { showActionEditor(nil) }
+    @objc private func editCandidateAction() { showActionEditor(ConfigurationStore.shared.candidateAction) }
+    private func showActionEditor(_ action:AIAction?) {
+        actionEditor = AIActionWindow(action:action) { [weak self] value in
+            if let value { ConfigurationStore.shared.candidateActionID = value.id }
+            self?.updateCandidateActions()
+        }
+        actionEditor?.show(parent:window)
+    }
     @objc private func updatePinyinControls() {
         let store = ConfigurationStore.shared
         contextAwareness.state = store.contextAwarenessEnabled ? .on : .off
@@ -83,8 +142,8 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
     @objc private func openKeyboardSettings() { AppPresence.shared.openKeyboardSettings() }
     func capture(to url:URL) throws {
         // Rendering the input settings for tests must not open a window or
-        // read an API key from Keychain.
-        if window == nil { build(); updatePinyinControls(); updateInputStatus() }
+        // load an API key.
+        if window == nil { build(); updatePinyinControls(); updateCandidateActions(); updateInputStatus() }
         guard let view = window.contentView else { return }
         view.layoutSubtreeIfNeeded()
         view.displayIfNeeded()
@@ -113,7 +172,7 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
             field.cell?.usesSingleLineMode = true
             field.cell?.isScrollable = true
         }
-        let tabs = NSTabView(); tabs.translatesAutoresizingMaskIntoConstraints = false
+        tabs.translatesAutoresizingMaskIntoConstraints = false
         window.contentView!.addSubview(tabs)
         NSLayoutConstraint.activate([tabs.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor,constant:16),tabs.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor,constant:-16),tabs.topAnchor.constraint(equalTo:window.contentView!.topAnchor,constant:16),tabs.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor,constant:-16)])
         func page(_ title:String) -> NSStackView {
@@ -144,19 +203,21 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
         full(label("选择后自动保存；正在输入的拼音选完后切换。"))
         contextAwareness.target = self; contextAwareness.action = #selector(changeContextAwareness)
         contextAwareness.identifier = NSUserInterfaceItemIdentifier("context-awareness"); full(contextAwareness)
-        let contextHint = NSTextField(wrappingLabelWithString:"连续确认中文后，候选窗显示「上下文」。失焦、移动光标或删改后暂停；重新聚焦并确认中文后再启用。本地处理，不调用 AI。")
+        let contextHint = NSTextField(wrappingLabelWithString:"连续确认中文后，候选窗显示小链环图标，悬停可查看说明。失焦、移动光标或删改后暂停；重新聚焦并确认中文后再启用。本地处理，不调用 AI。")
         contextHint.font = .systemFont(ofSize:12); contextHint.textColor = .secondaryLabelColor; full(contextHint)
         full(divider())
         editorShortcut.configure(); full(editorShortcut)
         full(label("在方寸输入法中生效；编辑区 Enter 换行，Ctrl＋Enter 执行 AI 动作。"))
-        let guide = NSTextField(wrappingLabelWithString:"空格确认候选，左右键移动候选高亮。\n- 上一页，= 或 + 下一页。\n回到首项后再按左键，可以编辑拼音。\n轻按 Shift 临时输入英文。\n\n开启「译英」后，先完成选词，再按 Ctrl＋Enter 翻译整段。打字和选词不调用模型。")
+        let guide = NSTextField(wrappingLabelWithString:"空格确认候选，左右键移动候选高亮。\n- 上一页，= 或 + 下一页。\n回到首项后再按左键，可以编辑拼音。\n轻按 Shift 临时输入英文。\n\n开启候选框 AI 动作后，先完成选词，再按 Ctrl＋Enter 处理整段，Enter 将结果上屏。「候选动作」页可选择或自定义动作。打字和选词不调用模型。")
         guide.font = .systemFont(ofSize:12); guide.textColor = .secondaryLabelColor; full(guide)
         NotificationCenter.default.addObserver(self,selector:#selector(updatePinyinControls),name:.pinyinLayoutChanged,object:nil)
         root = page("AI")
         full(label("模型连接用于翻译、改文字和问 AI。"))
         full(label("服务地址")); endpoint.placeholderString = "https://api.example.com/v1"; endpoint.delegate = self; endpoint.bezelStyle = .roundedBezel; full(endpoint)
         full(label("模型名称")); model.placeholderString = "填写服务中的模型 ID"; model.bezelStyle = .roundedBezel; full(model)
-        full(label("API Key（本地服务可留空）")); key.placeholderString = "密钥仅保存到 macOS 钥匙串"; key.bezelStyle = .roundedBezel; full(key)
+        full(label("API Key（本地服务可留空）")); key.placeholderString = "保存在本机，不再请求钥匙串授权"; key.delegate = self; key.bezelStyle = .roundedBezel; full(key)
+        key.identifier = NSUserInterfaceItemIdentifier("api-key")
+        endpoint.identifier = NSUserInterfaceItemIdentifier("model-endpoint")
         full(label("英语翻译偏好（选填）"))
         let scroll = NSScrollView(); scroll.borderType = .bezelBorder; scroll.hasVerticalScroller = true
         instruction.frame = NSRect(x:0,y:0,width:346,height:100)
@@ -170,12 +231,39 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
         status.font = .systemFont(ofSize:11); status.textColor = .secondaryLabelColor; full(status)
         let actions = NSStackView(); actions.orientation = .horizontal; actions.spacing = 9
         testButton = NSButton(title:"测试翻译（调用 1 次）",target:self,action:#selector(testModel)); testButton.bezelStyle = .rounded
-        let save = NSButton(title:"保存",target:self,action:#selector(save)); save.bezelStyle = .rounded
-        actions.addArrangedSubview(testButton); actions.addArrangedSubview(save); full(actions)
+        saveButton = NSButton(title:"保存",target:self,action:#selector(save)); saveButton.bezelStyle = .rounded
+        saveButton.identifier = NSUserInterfaceItemIdentifier("save-model")
+        actions.addArrangedSubview(testButton); actions.addArrangedSubview(saveButton); full(actions)
         full(label("仅在主动执行动作或提问时发送文字到以上服务。"))
+        root = page("候选动作")
+        full(label("候选框的 AI 动作"))
+        candidateActionPicker.target = self; candidateActionPicker.action = #selector(changeCandidateAction)
+        candidateActionPicker.setAccessibilityLabel("候选框 AI 动作"); full(candidateActionPicker)
+        let actionButtons = NSStackView(); actionButtons.spacing = 9
+        for (title,selector) in [("编辑指令",#selector(editCandidateAction)),("＋ 自定义",#selector(newCandidateAction))] {
+            let button = NSButton(title:title,target:self,action:selector); button.bezelStyle = .rounded; actionButtons.addArrangedSubview(button)
+        }
+        full(actionButtons)
+        let actionHint = NSTextField(wrappingLabelWithString:"候选框按钮显示所选动作的名称，点击开启或关闭；旁边的下拉箭头可快速切换。\n\n动作与临时编辑区共用，可以自定义名称和指令；两处分别记住所选动作。修改预设会另存为自定义动作。选择和保存立即生效，不调用模型。")
+        actionHint.font = .systemFont(ofSize:12); actionHint.textColor = .secondaryLabelColor; full(actionHint)
+        full(divider()); full(label("当前指令"))
+        let promptScroll = NSScrollView(); promptScroll.borderType = .bezelBorder; promptScroll.hasVerticalScroller = true
+        candidatePrompt.isRichText = false; candidatePrompt.isEditable = false; candidatePrompt.isSelectable = true
+        candidatePrompt.font = .systemFont(ofSize:12); candidatePrompt.textContainerInset = NSSize(width:7,height:7)
+        candidatePrompt.isVerticallyResizable = true; candidatePrompt.isHorizontallyResizable = false; candidatePrompt.autoresizingMask = [.width]; candidatePrompt.textContainer?.widthTracksTextView = true
+        candidatePrompt.setAccessibilityLabel("当前候选动作指令")
+        promptScroll.documentView = candidatePrompt; promptScroll.heightAnchor.constraint(equalToConstant:180).isActive = true; full(promptScroll)
+        let usage = NSTextField(wrappingLabelWithString:"英语润色：开启动作，按 Shift 切到 EN，输入英语，Ctrl＋Enter 润色，Enter 将结果上屏。\n\n回答问题：输入问题，完成选词后 Ctrl＋Enter，Enter 只将答案上屏。Esc 返回修改原文。")
+        usage.font = .systemFont(ofSize:12); usage.textColor = .secondaryLabelColor; full(usage)
+        NotificationCenter.default.addObserver(self,selector:#selector(updateCandidateActions),name:.aiActionsChanged,object:ConfigurationStore.shared)
+        NotificationCenter.default.addObserver(self,selector:#selector(updateCandidateActions),name:.candidateActionChanged,object:ConfigurationStore.shared)
+        NotificationCenter.default.addObserver(self,selector:#selector(updateCandidateActions),name:.modelConfigurationChanged,object:nil)
     }
     func controlTextDidChange(_ notification: Notification) {
-        if notification.object as? NSTextField === endpoint, endpoint.stringValue != loadedEndpoint { key.stringValue = "" }
+        if notification.object as? NSTextField === key { cancelKeyLoad() }
+        if notification.object as? NSTextField === endpoint, endpoint.stringValue != loadedEndpoint {
+            cancelKeyLoad(); key.stringValue = ""
+        }
     }
     @objc private func applyPreset(_ sender:NSButton) { instruction.string = ModelConfiguration.presets[sender.tag].1 }
     private func collect() throws -> ModelConfiguration {
@@ -185,7 +273,23 @@ final class SettingsWindow: NSObject, NSTextFieldDelegate, NSWindowDelegate {
         return config
     }
     @objc private func save() {
-        do { let config = try collect(); try SecureKeyStore.save(key.stringValue,endpoint:config.endpoint); ConfigurationStore.shared.model = config; loadedEndpoint = config.endpoint; NotificationCenter.default.post(name:.modelConfigurationChanged,object:nil); status.stringValue = "已保存。将在下一次主动执行时使用。" }
+        guard saveTask == nil else { return }
+        guard !keyLoadPending else { status.stringValue = "正在读取已保存的 API Key，请稍候；也可直接输入新 Key。"; return }
+        guard !keyLoadFailed || !key.stringValue.isEmpty else { status.stringValue = "请先重新粘贴 API Key 再保存，原有密钥未改动。"; return }
+        do {
+            let config = try collect(), apiKey = key.stringValue
+            saveButton.isEnabled = false
+            saveTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer { self.saveTask = nil; self.saveButton.isEnabled = true }
+                do {
+                    try await self.keyStore.save(apiKey,endpoint:config.endpoint)
+                    ConfigurationStore.shared.model = config; self.loadedEndpoint = config.endpoint
+                    NotificationCenter.default.post(name:.modelConfigurationChanged,object:nil)
+                    self.status.stringValue = "已保存到本机。下次主动执行时使用，无需钥匙串授权。"
+                } catch { self.status.stringValue = error.localizedDescription }
+            }
+        }
         catch { status.stringValue = error.localizedDescription }
     }
     @objc private func testModel() {

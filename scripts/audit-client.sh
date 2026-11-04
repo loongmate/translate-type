@@ -23,6 +23,6 @@ done
 clang -fobjc-arc -O2 -I "$RIME/include" -c Sources/RimeBridge.m -o .build/ClientAuditRimeBridge.o
 swiftc -swift-version 5 -Onone -import-objc-header Sources/RimeBridge.h \
     "${SOURCES[@]}" Tests/TextClient.swift Tests/ClientBehaviorAudit.swift .build/ClientAuditRimeBridge.o \
-    -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon -framework Security \
+    -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon \
     -Xlinker -rpath -Xlinker "$RIME/lib" -o "$APP/Contents/MacOS/ClientAudit"
 "$APP/Contents/MacOS/ClientAudit" "${1:-.build/client-behavior-audit.json}"

@@ -1,9 +1,10 @@
 ---
 name: fangcun_double
-version: "1.0"
+version: "1.1"
 sort: by_weight
 import_tables:
   - pinyin_simp
   - base
+  - fangcun_emoji_names
   - fangcun_english
 ...

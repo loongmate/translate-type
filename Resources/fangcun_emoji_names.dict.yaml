@@ -1,0 +1,13 @@
+# Chinese aliases missing from the base dictionaries; emoji come from opencc/emoji.txt.
+---
+name: fangcun_emoji_names
+version: "1.0"
+sort: by_weight
+...
+倒赞	dao zan	100
+对勾	dui gou	100
+白方块	bai fang kuai	100
+红方块	hong fang kuai	100
+绿方块	lv fang kuai	100
+蓝方块	lan fang kuai	100
+黑方块	hei fang kuai	100

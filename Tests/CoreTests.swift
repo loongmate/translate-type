@@ -24,6 +24,129 @@ struct CoreTests {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("TranslateTypeTests-"+UUID().uuidString)
         try PinyinEngine.initialize(resources:root.appendingPathComponent("Resources"),user:temp)
         defer { try? FileManager.default.removeItem(at:temp) }
+        for layout in PinyinLayout.allCases {
+            for translating in [false,true] {
+                let punctuation = CompositionSession(engine:try PinyinEngine(layout:layout),translateEnabled:translating)
+                var output = ""
+                punctuation.onInsert = { output += $0 }
+                let label = "\(layout.name) / \(translating ? "译英草稿" : "中文上屏")"
+                func result() -> String { translating ? punctuation.draft : output }
+                check(punctuation.handle(key:47) && result() == "、" && !punctuation.hasPendingInput,"\(label)：空输入按 / 直接确认顿号")
+                for c in "ni".unicodeScalars { punctuation.handle(key:Int(c.value)) }
+                check(punctuation.handle(key:47) && result() == "、" && punctuation.snapshot.input == "ni/","\(label)：未选字母后 / 保留原码和半角斜杠，不确认中文候选")
+                punctuation.handle(key:32)
+                check(result() == "、ni/" && !punctuation.hasPendingInput,"\(label)：空格明确确认含斜杠的原始片段")
+                let before = result()
+                check(!punctuation.handle(key:47,command:true) && result() == before,"\(label)：Command+/ 仍交给应用")
+                check(punctuation.handle(key:63,shift:true) && result() == before+"？","\(label)：Shift+/ 仍为中文问号")
+                let beforeBackslash = result()
+                check(punctuation.handle(key:92) && result() == beforeBackslash+"、" && !punctuation.hasPendingInput,"\(label)：空输入按反斜杠直接确认顿号")
+                let beforeLiteral = result()
+                for c in "ni\\path".unicodeScalars { punctuation.handle(key:Int(c.value)) }
+                check(punctuation.snapshot.input == "ni\\path" && result() == beforeLiteral,"\(label)：未选字母后的反斜杠保留原码，不确认中文候选")
+                punctuation.handle(key:32)
+                check(result() == beforeLiteral+"ni\\path" && !punctuation.hasPendingInput,"\(label)：空格完整确认含反斜杠的原始片段")
+                check(!punctuation.handle(key:92,command:true),"\(label)：Command+反斜杠仍交给应用")
+                let beforePipe = result()
+                if !punctuation.handle(key:124,shift:true) { output += "|" }
+                check(result() == beforePipe+"|" && !punctuation.hasPendingInput,"\(label)：Shift+反斜杠保留竖线（含交由宿主直输）")
+                if translating { check(output.isEmpty && !punctuation.isTranslating,"\(label)：标点留在草稿，不上屏也不调用模型") }
+                punctuation.setASCIIMode(true)
+                let englishStart = result()
+                let english = "https://a.b/c?x=1,2;ok!() C:\\path\\file"
+                for c in english.unicodeScalars { punctuation.handle(key:Int(c.value)) }
+                check(result() == englishStart+english,"\(label)：切英文后句点、斜杠及其他标点保持半角")
+            }
+        }
+        let helloCodes: [PinyinLayout:String] = [.fullPinyin:"nihao",.sogou:"nihk",.flypy:"nihc",.natural:"nihk",.microsoft:"nihk",.abc:"nihk",.pinyinJiajia:"nihd",.ziguang:"nihq"]
+        for layout in PinyinLayout.allCases {
+            for translating in [false,true] {
+                let literal = CompositionSession(engine:try PinyinEngine(layout:layout),translateEnabled:translating)
+                var output = "", keyReads = 0
+                literal.onInsert = { output += $0 }
+                literal.readKey = { _ in keyReads += 1; throw AppError.message("网址测试不能调用模型") }
+                let label = "\(layout.name) / \(translating ? "译英草稿" : "中文上屏")"
+                func type(_ text:String) { for c in text.unicodeScalars { literal.handle(key:Int(c.value)) } }
+                func result() -> String { translating ? literal.draft : output }
+                let samples = ["code.aliyun.com","repo.aliyun.com/a-b_v2?x=1+2&y=3#v4","AliYun.com:8080/path,ok;yes!()","https:","https://code.aliyun.com:8443/a-b_v2?x=1+2&y=3#v4","http://localhost:3000/a?x=1","SSH://Host:22"]
+                var expected = ""
+                for (i,text) in samples.enumerated() {
+                    for c in text.unicodeScalars { literal.handle(key:Int(c.value),shift:c == ":") }
+                    check(literal.snapshot.input == text && literal.snapshot.preedit == text && literal.candidates == [text] && result() == expected && literal.hasPendingInput && !literal.asciiMode,"\(label)：\(text) 全段原样预编辑，不选中文、不改标点、不翻页")
+                    literal.handle(key:0xff0d,control:true)
+                    check(keyReads == 0 && !literal.isTranslating && literal.snapshot.input == text,"\(label)：未确认网址不能启动翻译或改变输入")
+                    if i == 0 { literal.handle(key:0xff0d) }
+                    else if i == 1 { literal.handle(key:32) }
+                    else { literal.choose(0) }
+                    expected += text
+                    check(!literal.hasPendingInput && result() == expected && !literal.engine.isLiteralInput,"\(label)：Enter、空格或点击候选完整确认原始片段")
+                    if translating { check(output.isEmpty,"\(label)：确认的原始片段只进入草稿，不提前上屏") }
+                }
+                type(helloCodes[layout]!)
+                check(literal.candidates.contains("你好"),"\(label)：原样确认后自动恢复当前拼音方案")
+                literal.choose(literal.candidates.firstIndex(of:"你好")!)
+                type("."); expected += "你好。"
+                check(result() == expected && !literal.hasPendingInput,"\(label)：明确选好中文后点号仍直接输入中文句号")
+                literal.handle(key:58,shift:true); expected += "："
+                check(result() == expected && !literal.hasPendingInput,"\(label)：明确选好中文后冒号仍直接输入中文冒号")
+                type("nihao:")
+                check(literal.snapshot.input == "nihao:" && result() == expected,"\(label)：冒号不猜测协议名称或拼音，nihao: 也保留原码")
+                literal.discardPendingInput()
+                type("nihao.")
+                check(literal.snapshot.input == "nihao." && result() == expected,"\(label)：点号不猜测英文或拼音，nihao. 也保留原码")
+                literal.discardPendingInput()
+                type("code.aliyun.cmo")
+                for _ in 0..<2 { literal.handle(key:0xff51) }
+                literal.handle(key:0xffff); literal.handle(key:0xff53); type("m")
+                check(literal.snapshot.input == "code.aliyun.com" && literal.snapshot.caret == 15,"\(label)：网址中左右移动、前向删除和插入作用于真实光标")
+                literal.handle(key:0xff57); literal.handle(key:0xff08)
+                check(literal.snapshot.input == "code.aliyun.co","\(label)：End 后退格删除一个原始字符，不撤销选词")
+                literal.handle(key:0xff50); literal.handle(key:0xff08)
+                check(literal.snapshot.input == "code.aliyun.co" && literal.snapshot.caret == 0,"\(label)：Home 和开头退格不损坏原始片段")
+                literal.discardPendingInput()
+                type("code.")
+                for _ in 0..<5 { literal.handle(key:0xff08) }
+                check(!literal.hasPendingInput && !literal.engine.isLiteralInput,"\(label)：删除完整片段后恢复普通中文输入")
+                type("code."); literal.setASCIIMode(true); type("aliyun.com"); literal.setASCIIMode(false)
+                expected += "code.aliyun.com"
+                check(result() == expected && !literal.hasPendingInput,"\(label)：片段中切英文保留已有原码，切回后不残留直输状态")
+                type("code.aliyun.com")
+                literal.flushOriginal(); expected += "code.aliyun.com"
+                check(output == expected && !literal.hasPendingInput && !literal.engine.isLiteralInput,"\(label)：失焦提交完整原始片段并清理状态")
+            }
+        }
+        for translating in [false,true] {
+            let partial = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            var output = ""
+            partial.onInsert = { output += $0 }
+            for c in "nihao".unicodeScalars { partial.handle(key:Int(c.value)) }
+            partial.choose(partial.candidates.firstIndex(of:"你")!)
+            partial.handle(key:46)
+            check(partial.snapshot.input == "你hao." && partial.markedText == "你hao.","点号保留 Rime 中已经选好的中文前缀，只将未选尾部转为原码")
+            partial.handle(key:32)
+            check((translating ? partial.draft : output) == "你hao.","原样确认片段不把已选中文前缀还原为拼音")
+            let middle = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            for c in "nvhai".unicodeScalars { middle.handle(key:Int(c.value)) }
+            for _ in 0..<3 { middle.handle(key:0xff51) }
+            middle.handle(key:46)
+            check(middle.snapshot.input == "nv.hai" && middle.snapshot.caret == 3,"拼音光标中途按点保留后方输入，并按原始字母定位（含 ü 格式化）")
+            let colon = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            for c in "nihao".unicodeScalars { colon.handle(key:Int(c.value)) }
+            colon.choose(colon.candidates.firstIndex(of:"你")!)
+            colon.handle(key:58,shift:true)
+            check(colon.snapshot.input == "你hao:" && colon.markedText == "你hao:","冒号保留已选中文前缀，不确认未选尾部")
+            let tab = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            var tabOutput = ""
+            tab.onInsert = { tabOutput += $0 }
+            for c in "code.aliyun.com".unicodeScalars { tab.handle(key:Int(c.value)) }
+            check(!tab.handle(key:0xff09) && tabOutput == "code.aliyun.com" && !tab.hasPendingInput,"网址中 Tab 完整提交原文后交给宿主切换焦点")
+            let deferred = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            for c in "code.aliyun.com".unicodeScalars { deferred.handle(key:Int(c.value)) }
+            try deferred.requestPinyinLayout(.sogou)
+            check(deferred.pinyinLayout == .fullPinyin && deferred.pendingPinyinLayout == .sogou && deferred.snapshot.input == "code.aliyun.com","网址未确认时切换拼音方案不重解释片段")
+            deferred.handle(key:32)
+            check(deferred.pinyinLayout == .sogou && !deferred.hasPendingInput,"确认网址后应用待切换的拼音方案")
+        }
         var config = ModelConfiguration(endpoint:"http://127.0.0.1:18887/v1",model:"test-model",instruction:"")
         var inserted = ""
         let session = CompositionSession(engine:try PinyinEngine(),translateEnabled:false)
@@ -148,11 +271,12 @@ struct CoreTests {
             check(ModelConfiguration(endpoint:invalid).requestURL == nil,"拒绝无效或不安全接口：\(invalid)")
         }
         check(ModelConfiguration(instruction:"  \n ").effectiveInstruction == ModelConfiguration.defaultInstruction,"空白特殊指令使用默认规则")
-        let secureEndpoint = "http://localhost:18887/keychain-test-" + UUID().uuidString
-        try SecureKeyStore.save("test-only-secret",endpoint:secureEndpoint)
-        let read = try SecureKeyStore.read(endpoint:secureEndpoint)
-        try SecureKeyStore.save("",endpoint:secureEndpoint)
-        check(read == "test-only-secret","钥匙串真实保存读取与清理")
+        let secureEndpoint = "http://localhost:18887/local-key-test-" + UUID().uuidString
+        let keys = APIKeyStore(file:temp.appendingPathComponent("Credentials/api-keys.json"))
+        try await keys.save("test-only-secret",endpoint:secureEndpoint)
+        let read = try await keys.read(endpoint:secureEndpoint)
+        try await keys.save("",endpoint:secureEndpoint)
+        check(read == "test-only-secret","本机私有文件保存、读取与清空 API Key，无钥匙串访问")
         for path in ["redirect","malformed"] {
             config.endpoint = "http://127.0.0.1:18887/\(path)/v1"
             do { _ = try await TranslationClient().translate("你好",configuration:config,apiKey:""); fatalError("错误接口不能成功") }
@@ -213,7 +337,51 @@ struct CoreTests {
         let beforeNavigation = try await count()
         try candidateNavigationTests()
         check(try await count() == beforeNavigation,"候选导航、跨页和拼音编辑全程零模型请求")
+        try await slowCredentialTests(temp:temp)
         print("ALL CORE TESTS PASSED")
+    }
+    @MainActor static func slowCredentialTests(temp:URL) async throws {
+        for editor in [false,true] {
+            let started = DispatchSemaphore(value:0), release = DispatchSemaphore(value:0), finished = DispatchSemaphore(value:0)
+            var firstRead = true
+            let keys = APIKeyStore(file:temp.appendingPathComponent("slow-\(editor)/api-keys.json")) { url in
+                precondition(!Thread.isMainThread)
+                if firstRead {
+                    firstRead = false; started.signal(); _ = release.wait(timeout:.now()+5); finished.signal()
+                }
+                return try Data(contentsOf:url)
+            }
+            let values = ["http://127.0.0.1:18887/v1":"synthetic-slow-key"]
+            try FileManager.default.createDirectory(at:keys.file.deletingLastPathComponent(),withIntermediateDirectories:true)
+            try JSONEncoder().encode(values).write(to:keys.file)
+            let s = CompositionSession(engine:try PinyinEngine(),translateEnabled:true)
+            if editor { s.beginEditor() }
+            s.configuration = { ModelConfiguration(endpoint:"http://127.0.0.1:18887/v1",model:"mock-model") }
+            s.readKey = { try await keys.read(endpoint:$0) }
+            s.setASCIIMode(true)
+            for c in "source".unicodeScalars { s.handle(key:Int(c.value)) }
+            let before = try await count()
+            s.requestTranslation(); s.requestTranslation()
+            var entered = false
+            for _ in 0..<100 {
+                try await Task.sleep(nanoseconds:10_000_000)
+                if started.wait(timeout:.now()) == .success { entered = true; break }
+            }
+            check(entered && s.isTranslating,"\(editor ? "编辑区" : "候选框")：模拟后台密钥读取被阻塞")
+            let time = Date()
+            s.handle(key:120)
+            check(Date().timeIntervalSince(time) < 0.2 && s.draft == "sourcex" && !s.isTranslating,"慢密钥读取期间仍可立即打字，并取消旧请求")
+            release.signal()
+            for _ in 0..<100 {
+                try await Task.sleep(nanoseconds:10_000_000)
+                if finished.wait(timeout:.now()) == .success { break }
+            }
+            try await Task.sleep(nanoseconds:100_000_000)
+            check(try await count() == before && s.translation == nil && s.errorMessage == nil,"取消后迟到的密钥不会发送 HTTP 请求、显示旧错误或覆盖草稿")
+            // A new request uses the now-local key and sends the edited text.
+            s.requestTranslation(); try await until { !s.isTranslating }
+            check(try await count() == before+1 && s.translation == "Hello.","密钥读取恢复后可正常执行新请求")
+        }
     }
     @MainActor static func candidateNavigationTests() throws {
         for translating in [false,true] {

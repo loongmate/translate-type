@@ -19,7 +19,11 @@ if [ "$RESTORE_SOURCE" = 'com.translatetype.inputmethod.TranslateType.English' ]
 fi
 PIDS=$(pgrep -f '^/Users/.*/Library/Input Methods/(方寸输入法|FangCun|TranslateType).app/Contents/MacOS/TranslateType' || true)
 if [ -n "$PIDS" ]; then while read -r PID; do kill "$PID"; done <<< "$PIDS"; fi
-"$LSREGISTER" -u "$SOURCE" || true
+# Development/release copies share the installed bundle ID. Keep Launch
+# Services from resolving an input-method connection to an old or other-CPU copy.
+for DEVELOPMENT in "$SOURCE" "$PWD/build/releases/AppleSilicon/FangCun.app" "$PWD/build/releases/Intel/FangCun.app"; do
+    if [ -d "$DEVELOPMENT" ]; then "$LSREGISTER" -u "$DEVELOPMENT" || true; fi
+done
 if [ -d "$DESTINATION" ]; then mv "$DESTINATION" "$BACKUP"; fi
 mv "$STAGING" "$DESTINATION"
 "$LSREGISTER" -f "$DESTINATION"

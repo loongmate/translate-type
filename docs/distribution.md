@@ -1,5 +1,14 @@
 # 方寸输入法发布方案
 
+2026-11-04 更新：当前 DMG 预览版为 **0.1.0-beta.2 / build 42**，见 [本次发布说明](releases/v0.1.0-beta.2.md)。构建与打包命令：
+
+```sh
+FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh
+./scripts/package-dmg.sh
+```
+
+输出 `dist/FangCun-0.1.0-build42-{AppleSilicon,Intel}-preview.dmg` 及各自的 `.sha256`。DMG 内是对应架构的应用和手动安装说明，仍采用 ad hoc 签名且未公证；安装目录为 `~/Library/Input Methods/`。当前凭据存储等行为以本次发布说明为准。以下保留首版发布调查与正式安装器规划，反映当时的版本和环境。
+
 调查日期：2026-10-11。第一版按预览版发布到 GitHub Releases，分别提供 **Apple Silicon 版（M 系列芯片）** 和 **Intel 版**，版本为 `0.1.0-beta.1`。本版保留开发签名，Developer ID 和 Apple 公证后续补齐；用户在系统设置中为该应用确认“仍要打开”。下载与安装说明见 [预览版发布说明](releases/v0.1.0-beta.1.md)。
 
 ## 当前具备什么

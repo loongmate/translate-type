@@ -49,6 +49,10 @@ for CHIP in AppleSilicon Intel; do
     mkdir -p "build/releases/$CHIP"
     rm -rf "build/releases/$CHIP/FangCun.app"
     mv "$STAGING/$NAME/FangCun.app" "build/releases/$CHIP/FangCun.app"
+    # Distribution staging is not an installation. Its shared bundle ID must
+    # not compete with the copy in Library/Input Methods.
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+        -u "$PWD/build/releases/$CHIP/FangCun.app" || true
     mv "$STAGING/archives/$NAME.zip" "$STAGING/archives/$NAME.zip.sha256" dist/
     echo "本地预览包：$PWD/dist/$NAME.zip"
 done

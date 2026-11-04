@@ -31,12 +31,14 @@ for ARCH in "${ARCHS[@]}"; do
         -I "$RIME/include" -c Sources/RimeBridge.m -o "$OUTPUT/RimeBridge.o"
     swiftc "${SWIFT_FLAGS[@]}" -target "$ARCH-apple-macosx$MIN_MACOS" -sdk "$SDK" -O -module-name TranslateType \
         -import-objc-header Sources/RimeBridge.h Sources/*.swift "$OUTPUT/RimeBridge.o" \
-        -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon -framework Security \
+        -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon \
         -Xlinker -rpath -Xlinker @executable_path/../Frameworks -o "$OUTPUT/TranslateType"
     BINARIES+=("$OUTPUT/TranslateType")
 done
 cp "$RIME/lib/librime.1.17.0.dylib" "$APP/Contents/Frameworks/librime.1.dylib"
 cp Resources/*.yaml Resources/*LICENSE.txt Resources/*.pdf Resources/*.tiff Resources/*.icns "$APP/Contents/Resources/"
+cp -R Resources/opencc "$APP/Contents/Resources/"
+cp -R Resources/Preview "$APP/Contents/Resources/"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
 cp Resources/InfoPlist.strings "$APP/Contents/Resources/InfoPlist.strings"
 python3 - "$APP/Contents/Resources" <<'PY'

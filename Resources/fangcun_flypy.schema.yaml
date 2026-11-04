@@ -4,15 +4,18 @@
 schema:
   schema_id: fangcun_flypy
   name: 方寸小鹤双拼
-  version: "1.0"
+  version: "1.3"
 switches:
   - name: ascii_mode
     reset: 0
     states: [中文, English]
+  - name: emoji_suggestion
+    reset: 1
 engine:
   processors: [speller, punctuator, selector, navigator, express_editor]
   segmentors: [ascii_segmentor, abc_segmentor, punct_segmentor, fallback_segmentor]
   translators: [punct_translator, script_translator]
+  filters: [simplifier@emoji_conversion, uniquifier]
 speller:
   alphabet: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ;
   initials: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
@@ -64,6 +67,8 @@ navigator:
     Right: right_by_char_no_loop
 punctuator:
   half_shape:
+    '/': '、'
+    '\': '、'
     ',': '，'
     '.': '。'
     '?': '？'
@@ -72,3 +77,8 @@ punctuator:
     ';': '；'
     '(': '（'
     ')': '）'
+emoji_conversion:
+  opencc_config: emoji.json
+  option_name: emoji_suggestion
+  tips: none
+  inherit_comment: false

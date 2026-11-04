@@ -23,6 +23,6 @@ for SOURCE in Sources/*.swift; do
 done
 swiftc -swift-version 5 -Onone -import-objc-header Sources/RimeBridge.h \
     "${SOURCES[@]}" Tests/TextClient.swift Tests/ControllerTests.swift .build/RimeBridge.o \
-    -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon -framework Security \
+    -L "$RIME/lib" -lrime -framework AppKit -framework InputMethodKit -framework Carbon \
     -Xlinker -rpath -Xlinker "$RIME/lib" -o "$APP/Contents/MacOS/ControllerTests"
 "$APP/Contents/MacOS/ControllerTests" "$@"

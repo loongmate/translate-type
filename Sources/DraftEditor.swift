@@ -110,7 +110,7 @@ final class DraftDestination {
 }
 
 @MainActor
-final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
+final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTextOwner {
     typealias ResumeAction = (CompositionSession,any IMKTextInput)->Bool
     private struct Host {
         let client: any IMKTextInput
@@ -153,6 +153,13 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
     private let count = NSTextField(labelWithString:"")
     private let status = NSTextField(wrappingLabelWithString:"")
     private let destinationLabel = NSTextField(wrappingLabelWithString:"")
+    let transcript = ChatTranscriptView(frame:.zero)
+    private let chatTools = NSStackView()
+    private let newChat = NSButton()
+    private let continueChat = NSButton()
+    private let copyChat = NSButton()
+    private let directoryButton = NSButton()
+    private var sourceHeight: NSLayoutConstraint!
     private var panes: NSStackView!
     private var resultPane: NSView!
     private let language = NSButton()
@@ -187,7 +194,13 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         return !bundle.isEmpty && ([Bundle.main.bundleIdentifier ?? "",InputSourceStatus.bundleID]+InputSourceStatus.legacyBundleIDs).contains(bundle)
     }
     func hostActivated(_ client:any IMKTextInput,sessionID:UUID? = nil,resume:ResumeAction? = nil) {
-        guard let destination else { return }
+        guard let destination else {
+            guard session != nil, !Self.isInternalClient(client) else { return }
+            currentHost = Host(client:client,sessionID:sessionID,resume:resume)
+            hostHasMoved = true
+            refreshDestination()
+            return
+        }
         // Settings and transient clients belonging to this IME never replace
         // the external insertion destination.
         guard !Self.isInternalClient(client) else { return }
@@ -215,6 +228,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         if handoff == .opening { return "正在整理原输入位置…" }
         if handoff == .recovering { return "正在重新绑定光标…" }
         if handoff == .committing { return "正在返回原输入框…" }
+        if destination == nil { return "未绑定输入框，可以直接提问并复制回答。" }
         return hostHasMoved ? "输入位置已变化，请重新绑定光标后上屏。" : destination?.problem
     }
     var canCommitSource: Bool { insertSource.isEnabled }
@@ -248,14 +262,8 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         lastDiagnosticProblem = nil; lastObservedMismatch = nil
         EditorDiagnostics.record("open",destination!.diagnosticState())
         currentHost = Host(client:client,sessionID:sessionID,resume:resume)
-        session = state; resumeAction = resume; previousUpdate = state.onUpdate
-        state.onUpdate = { [weak self] in self?.refresh() }
-        previousDraft = state.draft; previousSelection = state.draftSelection
-        history.removeAllActions(); savedScroll = .zero; lastMarked = ""; lastCaret = -1; message = nil
-        if window == nil { build() }
-        style.selectItem(at:0)
-        setupAuxiliary()
-        modeHistory = [.transform:history]; reloadActions()
+        resumeAction = resume
+        prepareSession(state)
         // Return the triggering IMK key event before moving keyboard focus.
         // Browser clients may apply composition changes only after that return.
         handoff = .opening; showAfterHandoff = present
@@ -264,6 +272,17 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
             EditorDiagnostics.record("clear-request",destination!.diagnosticState())
         }
         settleOpening()
+    }
+    private func prepareSession(_ state:CompositionSession) {
+        session = state; previousUpdate = state.onUpdate
+        state.onUpdate = { [weak self] in self?.refresh() }
+        state.agent.onUpdate = { [weak self] in self?.refresh() }
+        previousDraft = state.draft; previousSelection = state.draftSelection
+        history.removeAllActions(); savedScroll = .zero; lastMarked = ""; lastCaret = -1; message = nil
+        if window == nil { build() }
+        style.selectItem(at:0)
+        setupAuxiliary()
+        modeHistory = [.transform:history]; reloadActions()
     }
     private func settleOpening() {
         handoffTask?.cancel()
@@ -321,8 +340,9 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         }
     }
     @objc func collapse() {
-        guard let session, let destination else { return }
+        guard let session else { return }
         if session.editorMode == .ask || session.editorAction.id != "english" { hide(); return }
+        guard let destination else { hide(); return }
         guard handoff == nil else { return }
         if let problem = targetProblem { message = problem; refresh(); return }
         savedScroll = source.enclosingScrollView?.contentView.bounds.origin ?? .zero
@@ -341,6 +361,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         commit(session?.draft)
     }
     var selectedResult: String? {
+        if session?.editorMode == .ask { return transcript.answerSelection(or:session?.agent.latestAnswer) }
         guard let text = session?.translation else { return nil }
         let selection = result.selectedRange(), value = text as NSString
         if selection.length > 0, selection.location != NSNotFound, NSMaxRange(selection) <= value.length {
@@ -349,15 +370,16 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         return text
     }
     @objc func commitResult() {
-        guard session?.isTranslating == false else { return }
+        guard session?.isTranslating == false, session?.agent.isRunning == false else { return }
         commit(selectedResult)
     }
     @objc func commitPreferred() {
         guard let session else { return }
         // While a result is pending, Cmd+Enter must never unexpectedly submit
         // the source. Cmd+Shift+Enter is the explicit original-text action.
-        guard !session.isTranslating else { refresh(); return }
-        if session.translation != nil { commit(selectedResult) }
+        guard !session.isTranslating, !session.agent.isRunning else { refresh(); return }
+        if session.editorMode == .ask { commit(selectedResult) }
+        else if session.translation != nil { commit(selectedResult) }
         else if session.editorMode == .transform && session.displayedAnswer == nil { commit(session.draft) }
         else { message = "请先生成有效结果，或在改文字中明确选择原文上屏。"; refresh() }
     }
@@ -460,19 +482,19 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         let observedApp = currentHost.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier:$0.client.bundleIdentifier() ?? "").first }
         let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         recover.title = observedApp != nil && frontPID != observedApp?.processIdentifier && frontPID != ProcessInfo.processInfo.processIdentifier ? "返回目标应用" : "重新绑定光标"
-        recover.isEnabled = handoff == nil
+        recover.isEnabled = handoff == nil && currentHost != nil
         recover.toolTip = "只重新绑定输入位置；绑定后按 ⌘Enter 或点击上屏按钮写入文字"
         let valid = destination != nil && problem == nil && !hasPendingInput
         insertSource.isEnabled = valid && !s.draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
-        insertResult.isEnabled = valid && !s.isTranslating && !(selectedResult ?? "").trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+        insertResult.isEnabled = valid && !s.isTranslating && !s.agent.isRunning && !(selectedResult ?? "").trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
         insertSource.isHidden = s.editorMode == .ask
         insertSource.title = s.displayedAnswer != nil || s.isTranslating ? "原文上屏 ⇧⌘↵" : "原文上屏 ⌘↵"
         insertSource.toolTip = "将原文写回原输入框（⇧⌘Enter）；不会发送消息"
-        insertResult.title = result.selectedRange().length > 0 ? "插入选中 ⌘↵" : "结果上屏 ⌘↵"
+        insertResult.title = s.editorMode == .ask ? (transcript.textView.selectedRange().length > 0 ? "插入所选回答 ⌘↵" : "插入回答 ⌘↵") : result.selectedRange().length > 0 ? "插入选中 ⌘↵" : "结果上屏 ⌘↵"
         insertResult.toolTip = "把结果或选中的部分写回原输入框（⌘Enter）；不会发送消息"
         copyAnswer.title = result.selectedRange().length > 0 ? "复制选中" : "复制"
         copyAnswer.isEnabled = !hasPendingInput && !(s.displayedAnswer ?? "").isEmpty && !s.isTranslating
-        if result.selectedRange().length > 0 { count.stringValue = "已选 \((selectedResult ?? "").count) 字 · ⌘Enter 只插入选中部分" }
+        if s.editorMode == .transform && result.selectedRange().length > 0 { count.stringValue = "已选 \((selectedResult ?? "").count) 字 · ⌘Enter 只插入选中部分" }
     }
     func refresh() {
         guard let s = session, window != nil else { return }
@@ -502,7 +524,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         syncAuxiliary(followUp,with:s.editorFollowUp)
         syncAuxiliary(result,with:s.displayedAnswer ?? "")
         result.isEditable = s.translation != nil && !s.isTranslating
-        resultPane.isHidden = s.displayedAnswer == nil && !s.isTranslating
+        resultPane.isHidden = s.editorMode == .ask || (s.displayedAnswer == nil && !s.isTranslating)
         modes.selectedSegment = s.editorMode.rawValue
         sourceTitle.stringValue = s.editorMode == .ask ? "想让 AI 做什么？" : "原文"
         source.setAccessibilityLabel(sourceTitle.stringValue)
@@ -514,7 +536,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         referenceToggle.isHidden = s.editorMode != .ask
         referenceToggle.title = "参考文字" + (s.editorReference.isEmpty ? "" : " · \(s.editorReference.count) 字") + (referenceToggle.state == .on ? " ▾" : " ▸")
         referencePane.isHidden = s.editorMode != .ask || referenceToggle.state != .on
-        followUpPane.isHidden = s.editorMode != .ask || s.displayedAnswer == nil
+        followUpPane.isHidden = true
         followUp.isEditable = !s.isTranslating
         sendFollowUp.isEnabled = s.translation != nil && !s.isTranslating && !hasPendingInput && !s.editorFollowUp.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
         if versions.numberOfItems != s.answers.count {
@@ -527,12 +549,33 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         count.stringValue = selection > 0 ? "已选 \(selection) 字 · ⌘Enter 只插入选中部分" : "\(s.draft.count) 字  ·  Enter 换行  ·  ⌘V 粘贴  ·  ⌘Enter 上屏"
         let editing = editingSession(for:window.firstResponder as? DraftTextView ?? source) ?? s
         language.title = "\(editing.asciiMode ? "EN" : editing.pinyinLayout.shortName) ⇧"
+        if window.isKeyWindow { AppPresence.shared.updateInputLanguage(asciiMode:editing.asciiMode) }
         translate.isHidden = s.isTranslating
         translate.isEnabled = s.canRequestTranslation && !hasPendingInput
         translate.title = hasPendingInput ? "先完成选词" : s.draft.count > TranslationClient.maximumCharacters ? "请分段处理" : s.editorMode == .ask ? (s.translation == nil ? "问 AI ⌃↵" : "重新回答 ⌃↵") : (s.translation == nil ? "执行动作 ⌃↵" : "重新生成 ⌃↵")
         cancel.isHidden = !s.isTranslating; insertResult.isHidden = s.displayedAnswer == nil
         status.stringValue = s.draft.count > TranslationClient.maximumCharacters ? "单次输入最多 20,000 字，草稿完整保留。" : hasPendingInput ? "空格确认候选；完成选词后才能执行或上屏。" : s.isTranslating ? "正在处理… 可随时停止，输入内容仍保留。" : s.errorMessage ?? message ?? (s.translation == nil && s.displayedAnswer != nil ? "输入或动作已变化，右侧为旧结果；重新执行后才能上屏。" : s.editorMode == .ask ? "⌃Enter 提问；在追问框中继续问。可修改回答、选择一部分再 ⌘Enter 上屏。" : "⌃Enter 执行动作；⌘Enter 上屏结果，⇧⌘Enter 上屏原文。不会发送消息。")
         status.textColor = s.errorMessage != nil ? .systemOrange : .secondaryLabelColor
+        let asking = s.editorMode == .ask
+        transcript.isHidden = !asking; chatTools.isHidden = !asking
+        sourceHeight.constant = asking ? 75 : 130
+        if asking {
+            transcript.update(s.agent.messages)
+            sourceTitle.stringValue = "消息 · Enter 换行，⌃Enter 发送"
+            source.setAccessibilityLabel("发送给问问 AI 的消息")
+            translate.title = "发送 ⌃↵"; translate.isHidden = s.agent.isRunning
+            translate.isEnabled = s.canRequestTranslation && !s.agent.isRunning && !hasPendingInput
+            cancel.isHidden = !s.agent.isRunning
+            insertResult.isHidden = s.agent.latestAnswer == nil
+            newChat.isEnabled = !hasPendingInput
+            continueChat.isHidden = s.agent.error == nil; continueChat.isEnabled = !s.agent.isRunning && !hasPendingInput
+            copyChat.isEnabled = !s.agent.isRunning && s.agent.latestAnswer != nil
+            directoryButton.title = "工作目录：" + (s.agent.directory as NSString).lastPathComponent
+            directoryButton.toolTip = s.agent.directory; directoryButton.isEnabled = !s.agent.isRunning
+            status.stringValue = hasPendingInput ? "请先完成选词，再发送消息。" : message ?? s.agent.status
+            status.textColor = s.agent.error == nil ? .secondaryLabelColor : .systemOrange
+            count.stringValue = "\(s.draft.count) 字 · \(s.agent.messages.filter { $0.role == "user" }.count) 轮对话 · ⌘Enter 插入所选回答或最新回答"
+        }
         rendering = false
         refreshDestination(); refreshCandidates()
     }
@@ -618,6 +661,23 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         message = nil; session?.requestEditorAction(followUp:true)
     }
     @objc private func stopTranslation() { session?.stopEditorRequest() }
+    @objc func startNewConversation() {
+        guard !hasPendingInput else { informPending(); return }
+        session?.agent.reset(); message = nil; refresh()
+    }
+    @objc func continueConversation() {
+        guard !hasPendingInput, let s = session else { return }
+        message = nil; s.agent.resume(configuration:s.configuration(),readKey:s.readKey)
+    }
+    @objc private func chooseDirectory() {
+        guard session?.agent.isRunning == false else { return }
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false; panel.prompt = "使用此目录"; panel.message = "问问 AI 的文件操作与命令将从此目录开始。"
+        panel.directoryURL = URL(fileURLWithPath:session?.agent.directory ?? NSHomeDirectory())
+        panel.beginSheetModal(for:window) { [weak self] response in
+            if response == .OK, let url = panel.url { self?.session?.agent.setDirectory(url.path) }
+        }
+    }
     @objc private func changeLanguage() {
         let state = editingSession(for:window.firstResponder as? DraftTextView ?? source)
         state?.setASCIIMode(!(state?.asciiMode ?? false))
@@ -644,9 +704,26 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         selectMode(.ask)
         if s.draft.isEmpty && !text.isEmpty { s.replaceEditorText(text,selection:NSRange(location:text.utf16.count,length:0)) }
     }
+    func openQuestionFromMenu() {
+        if session == nil {
+            do {
+                let state = CompositionSession(engine:try PinyinEngine(layout:ConfigurationStore.shared.pinyinLayout),translateEnabled:false)
+                state.beginEditor()
+                prepareSession(state)
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "无法打开问问 AI"
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+                return
+            }
+        }
+        openQuestion()
+        show()
+    }
     @objc func restoreLastContent() {
-        guard let s = session, let archive = lastArchive, !hasPendingInput, !s.isTranslating else { return }
-        guard s.editorArchive.drafts.values.allSatisfy({ $0.text.isEmpty && $0.reference.isEmpty && $0.followUp.isEmpty }) else {
+        guard let s = session, let archive = lastArchive, !hasPendingInput, !s.isTranslating, !s.agent.isRunning else { return }
+        guard s.agent.messages.isEmpty, s.editorArchive.drafts.values.allSatisfy({ $0.text.isEmpty && $0.reference.isEmpty && $0.followUp.isEmpty }) else {
             message = "当前还有草稿，请先保留或清空，再取用上次内容。"; refresh(); return
         }
         restoring = true; s.restoreArchive(archive); restoring = false
@@ -692,6 +769,9 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         session?.selectAnswer(versions.indexOfSelectedItem)
     }
     @objc private func configurationChanged() { session?.configurationChanged() }
+    @objc private func actionsChanged() {
+        session?.refreshEditorAction(); reloadActions(); refresh()
+    }
     @objc private func layoutChanged() {
         do {
             try session?.requestPinyinLayout(ConfigurationStore.shared.pinyinLayout)
@@ -710,7 +790,8 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
     @objc private func pasteDraft() { window.makeFirstResponder(source); source.paste(nil) }
     @objc private func copySource() { copy(session?.draft ?? "") }
     @objc func copyResult() {
-        guard !hasPendingInput, session?.isTranslating == false else { return }
+        guard !hasPendingInput, session?.isTranslating == false, session?.agent.isRunning == false else { return }
+        if session?.editorMode == .ask { copy(selectedResult ?? ""); return }
         let text = result.string as NSString, range = result.selectedRange()
         copy(range.length > 0 && NSMaxRange(range) <= text.length ? text.substring(with:range) : text as String)
     }
@@ -778,6 +859,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
         window.minSize = NSSize(width:820,height:600); window.appearance = NSAppearance(named:.aqua)
         window.setFrameAutosaveName("FangCunDraftEditor"); window.center()
         NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
+        NotificationCenter.default.addObserver(self,selector:#selector(actionsChanged),name:.aiActionsChanged,object:ConfigurationStore.shared)
         NotificationCenter.default.addObserver(self,selector:#selector(layoutChanged),name:.pinyinLayoutChanged,object:nil)
         history.levelsOfUndo = 100
         window.backgroundColor = NSColor(calibratedRed:0.98,green:0.97,blue:0.99,alpha:1)
@@ -827,10 +909,28 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate {
             text.isVerticallyResizable = true; text.isHorizontallyResizable = false; text.autoresizingMask = [.width]; text.textContainer?.widthTracksTextView = true
             text.setAccessibilityLabel(title); scroll.documentView = text
             box.addArrangedSubview(scroll)
-            NSLayoutConstraint.activate([heading.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:minimum)])
+            if text === source {
+                sourceHeight = scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:minimum)
+                sourceHeight.isActive = true
+                let preferred = scroll.heightAnchor.constraint(equalToConstant:90); preferred.priority = .defaultHigh; preferred.isActive = true
+            }
+            NSLayoutConstraint.activate([heading.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:text === source ? 0 : minimum)])
             return box
         }
         let sourcePane = pane("原文",source,#selector(copySource))
+        sourcePane.insertArrangedSubview(transcript,at:0)
+        transcript.widthAnchor.constraint(equalTo:sourcePane.widthAnchor).isActive = true
+        transcript.heightAnchor.constraint(greaterThanOrEqualToConstant:170).isActive = true
+        chatTools.orientation = .horizontal; chatTools.spacing = 8
+        button(newChat,"新建对话",#selector(startNewConversation)); chatTools.addArrangedSubview(newChat)
+        button(continueChat,"继续",#selector(continueConversation)); chatTools.addArrangedSubview(continueChat)
+        button(copyChat,"复制回答",#selector(copyResult)); chatTools.addArrangedSubview(copyChat)
+        chatTools.addArrangedSubview(spacer())
+        button(directoryButton,"工作目录",#selector(chooseDirectory)); chatTools.addArrangedSubview(directoryButton)
+        directoryButton.widthAnchor.constraint(lessThanOrEqualToConstant:280).isActive = true
+        (directoryButton.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingMiddle
+        sourcePane.insertArrangedSubview(chatTools,at:1)
+        chatTools.widthAnchor.constraint(equalTo:sourcePane.widthAnchor).isActive = true
         let resultBox = pane("结果 · 可修改",result,#selector(copyResult)); resultPane = resultBox
         referencePane = pane("参考文字 · 可选，只作为本次资料",reference,#selector(copySource),minimum:60)
         sourcePane.addArrangedSubview(referencePane)
@@ -893,8 +993,17 @@ final class DraftEditorPanel: NSPanel {
 }
 
 @MainActor
+protocol DraftTextOwner: AnyObject {
+    func refresh()
+    func flagsChanged(_ event:NSEvent)
+    func handleKey(_ event:NSEvent,in view:DraftTextView) -> Bool
+    func editingSession(for view:DraftTextView) -> CompositionSession?
+    func informPending()
+}
+
+@MainActor
 final class DraftTextView: NSTextView {
-    weak var owner: DraftEditor?
+    weak var owner: (any DraftTextOwner)?
     // Feed the shared Rime session directly; never recursively start our IMK
     // server for its own editor. AppKit still supplies editing/selection/clipboard.
     override var inputContext: NSTextInputContext? { nil }
@@ -920,5 +1029,5 @@ final class DraftTextView: NSTextView {
 }
 
 extension CompositionSession {
-    func cancelTranslationIfWorking() { if isTranslating { stopEditorRequest() } }
+    func cancelTranslationIfWorking() { if isTranslating || agent.isRunning { stopEditorRequest() } }
 }

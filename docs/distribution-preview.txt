@@ -1,4 +1,4 @@
-方寸输入法 · 0.1.0-beta.1 预览版（build 22）
+方寸输入法 · 预览版
 
 本包只有临时代码签名，没有 Developer ID 签名或 Apple 公证。
 首次打开可能被 macOS 拦截，需要由你在系统设置中确认允许此应用。
@@ -13,7 +13,8 @@
 首次安装：
 1. Finder 按 Cmd + Shift + G，前往 ~/Library/Input Methods/。
    如果目录不存在，可在 ~/Library/ 中创建 Input Methods 文件夹。
-2. 将 FangCun.app 复制到该文件夹，不要在解压目录直接启动输入法。
+2. 将 FangCun.app 复制到该文件夹，不要在 DMG 或解压目录直接启动输入法。
+   DMG 用户复制完成后可推出磁盘映像；不要拖入“应用程序”文件夹。
 3. 双击复制后的 FangCun.app。若提示无法验证开发者或无法检查恶意软件，
    打开系统设置 → 隐私与安全性，在安全性区域点击“仍要打开”，再确认“打开”。
    较旧系统的入口名称可能是“安全性与隐私”。只对你确认来源的方寸应用执行此操作。
@@ -35,7 +36,13 @@ Apple 的操作说明：https://support.apple.com/zh-cn/102445
 Ctrl + Shift + Enter：临时编辑区；Ctrl + Enter：执行；Cmd + Enter：上屏。
 
 卸载：先切换到 ABC，在系统键盘设置中移除方寸，退出方寸后移走安装的 FangCun.app。
-卸载应用不会主动删除词库、偏好或钥匙串密钥。
+卸载应用不会主动删除词库、偏好、本机凭据或临时编辑器恢复稿。
+
+API Key 按服务地址保存在本机私有文件：
+~/Library/Application Support/TranslateType/Credentials/api-keys.json
+文件未额外加密，仅当前用户可读写；不再使用钥匙串。
+“问 AI”可在本机读写文件、执行命令；所选工作目录不是权限沙箱。
+临时编辑器恢复稿保存在 ~/Library/Application Support/FangCun/Scratchpad/draft.json。
 
 源代码与发布准备说明：https://github.com/loongmate/translate-type
 引擎、词库及方案的许可保存在 FangCun.app/Contents/Resources/ 内。

@@ -14,15 +14,16 @@ final class CandidatePanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]
         level = .popUpMenu
     }
-    func show(session: CompositionSession, anchor: NSRect, expand: (()->Void)? = nil, ask: (()->Void)? = nil, settings: @escaping ()->Void) {
+    func show(session: CompositionSession, anchor: NSRect, expand: (()->Void)? = nil, ask: (()->Void)? = nil, configureAction: (()->Void)? = nil, settings: @escaping ()->Void) {
         guard !session.markedText.isEmpty || session.translation != nil else { orderOut(nil); return }
         revision += 1
         let screen = NSScreen.screens.first(where:{$0.frame.intersects(anchor)}) ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
         let composition = CompositionDisplay(session:session)
         let modeWidth = ceil((session.asciiMode ? "EN" : session.pinyinLayout.shortName).size(withAttributes:[.font:NSFont.systemFont(ofSize:11)]).width)
-        let actionWidth: CGFloat = (session.isInEditor ? 28 : 85) + (expand == nil ? 0 : 28) + (ask == nil ? 0 : 28)
-        let controlsWidth = modeWidth + actionWidth + (session.contextActive ? 50 : 0)
+        let labelWidth = ceil(session.candidateAction.compactCandidateLabel.size(withAttributes:[.font:NSFont.systemFont(ofSize:11)]).width)
+        let actionWidth: CGFloat = (session.isInEditor ? 28 : labelWidth+82) + (expand == nil ? 0 : 28) + (ask == nil ? 0 : 28)
+        let controlsWidth = modeWidth + actionWidth + (session.contextActive ? 28 : 0)
         let candidateWidth = session.candidates.reduce(CGFloat(54)) { $0 + $1.size(withAttributes:[.font:NSFont.systemFont(ofSize:15)]).width + 35 }
         let width = min(max(320,candidateWidth,composition.text.size().width+controlsWidth+38),min(600,visible.width-12))
         let compositionWidth = max(40,width-controlsWidth-38)
@@ -36,7 +37,7 @@ final class CandidatePanel: NSPanel {
         let errorHeight = session.errorMessage.map { ceil(($0 as NSString).boundingRect(with:NSSize(width:width-26,height:.greatestFiniteMagnitude),options:.usesLineFragmentOrigin,attributes:[.font:NSFont.systemFont(ofSize:11)]).height)+6 } ?? 0
         let chromeHeight = compositionHeight+19 + (session.buffersText ? 40 : 0) + (session.isTranslating ? 28 : 0) + errorHeight
         let candidateHeight = min(naturalHeight,max(0,min(420,visible.height-12)-chromeHeight-7))
-        let root = CandidateView(session:session,revision:revision,composition:composition,compositionWidth:compositionWidth,compositionHeight:compositionHeight,controlsWidth:controlsWidth,candidateHeight:candidateHeight,expand:expand,ask:ask,settings:settings)
+        let root = CandidateView(session:session,revision:revision,composition:composition,compositionWidth:compositionWidth,compositionHeight:compositionHeight,controlsWidth:controlsWidth,candidateHeight:candidateHeight,expand:expand,ask:ask,configureAction:configureAction ?? settings,settings:settings)
         if let host { host.rootView = root }
         else { let view = NSHostingView(rootView:root); host = view; contentView = view }
         let height = ceil(host!.fittingSize.height)
@@ -182,7 +183,7 @@ private struct CandidateList: View {
     private func candidate(_ index:Int,_ text:String,large:Bool) -> some View {
         Button { session.choose(index) } label: {
             HStack(alignment:.firstTextBaseline,spacing:7) {
-                Text("\(index+1)").font(.system(size:10)).foregroundStyle(.secondary).fixedSize()
+                Text(session.engine.isLiteralInput ? "原文" : "\(index+1)").font(.system(size:10)).foregroundStyle(.secondary).fixedSize()
                 Text(text).font(.system(size:large ? 13 : 15)).multilineTextAlignment(.leading).fixedSize(horizontal:false,vertical:true)
                 if large { Spacer(minLength:0) }
             }.padding(.horizontal,8).padding(.vertical,large ? 8 : 6)
@@ -190,7 +191,7 @@ private struct CandidateList: View {
                 .background(index == session.highlighted ? purple.opacity(0.1) : .clear)
                 .clipShape(RoundedRectangle(cornerRadius:5))
                 .contentShape(Rectangle())
-        }.buttonStyle(.plain).help(text).accessibilityLabel("\(index+1) \(text)")
+        }.buttonStyle(.plain).help(text).accessibilityLabel(session.engine.isLiteralInput ? "原文 \(text)" : "\(index+1) \(text)")
     }
 }
 
@@ -205,6 +206,7 @@ private struct CandidateView: View {
     let candidateHeight: CGFloat
     var expand: (()->Void)?
     var ask: (()->Void)?
+    var configureAction: ()->Void
     var settings: ()->Void
     private let purple = Color(red:0.47,green:0.34,blue:0.76)
     var body: some View {
@@ -215,23 +217,40 @@ private struct CandidateView: View {
                     .help("← → 选择候选 · - / + 翻页 · 首项再按 ← 编辑拼音 · 长输入可滚动查看")
                 HStack(spacing:12) {
                     if session.contextActive {
-                        Text("上下文").font(.system(size:10)).foregroundStyle(purple)
-                            .help("正在参考同一输入框中连续确认的前文，使用本地词库调整候选；移动光标或删改后暂停。")
+                        Image(systemName:"link").font(.system(size:11,weight:.medium)).foregroundStyle(purple)
+                            .frame(width:16,height:16)
+                            .help("上下文感知中：参考连续确认的前文，使用本地词库调整候选；移动光标或删改后暂停。")
                             .accessibilityLabel("上下文感知中")
                     }
                     Button { session.setASCIIMode(!session.asciiMode) } label: {
                         Text(session.asciiMode ? "EN" : session.pinyinLayout.shortName).font(.system(size:11)).foregroundStyle(.secondary)
                     }.help(session.pendingPinyinLayout.map { "选完当前拼音后切换为\($0.name)" } ?? "\(session.pinyinLayout.name) · Shift 切换中英文")
-                    if !session.isInEditor { Button { session.setTranslateEnabled(!session.translateEnabled) } label: {
-                        HStack(spacing:5) { Text("译英"); Image(systemName:session.translateEnabled ? "checkmark.circle.fill" : "circle") }
-                            .font(.system(size:11)).foregroundStyle(session.translateEnabled ? purple : .secondary)
-                    } }
+                    if !session.isInEditor {
+                        Button { session.setTranslateEnabled(!session.translateEnabled) } label: {
+                            HStack(spacing:5) { Text(session.candidateAction.compactCandidateLabel); Image(systemName:session.translateEnabled ? "checkmark.circle.fill" : "circle") }
+                                .font(.system(size:11)).foregroundStyle(session.translateEnabled ? purple : .secondary)
+                        }.help("\(session.candidateAction.name) · 点击开启或关闭，Ctrl＋Enter 执行")
+                            .accessibilityLabel("\(session.candidateAction.name)，\(session.translateEnabled ? "已开启" : "已关闭")")
+                        Menu {
+                            ForEach(session.candidateActions) { action in
+                                Button { session.setCandidateAction(action) } label: {
+                                    if action.id == session.candidateAction.id { Label(action.name,systemImage:"checkmark") }
+                                    else { Text(action.name) }
+                                }
+                            }
+                            Divider()
+                            Button("自定义动作…",action:configureAction)
+                        } label: {
+                            Image(systemName:"chevron.down").font(.system(size:9)).foregroundStyle(.secondary)
+                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                            .help("选择候选框 AI 动作").accessibilityLabel("选择候选框 AI 动作")
+                    }
                     if let ask { Button(action:ask) { Image(systemName:"bubble.left.and.text.bubble.right").font(.system(size:12)).foregroundStyle(purple) }.help("问 AI：用已确认的草稿提问") }
                     if let expand { Button(action:expand) { Image(systemName:"arrow.up.left.and.arrow.down.right").font(.system(size:12)).foregroundStyle(purple) }.help("放大到临时编辑区") }
-                    Button(action:settings) { Image(systemName:"slider.horizontal.3").foregroundStyle(.secondary).font(.system(size:12)) }.help("输入与翻译设置")
+                    Button(action:settings) { Image(systemName:"slider.horizontal.3").foregroundStyle(.secondary).font(.system(size:12)) }.help("输入与 AI 设置")
                 }.buttonStyle(.plain).fixedSize().frame(width:controlsWidth,alignment:.trailing)
             }.padding(.horizontal,13).padding(.top,11).padding(.bottom,8)
-            if session.isTranslating { HStack { ProgressView().controlSize(.small); Text("正在翻译整句…").font(.system(size:12)); Spacer() }.padding(.horizontal,13).padding(.bottom,8) }
+            if session.isTranslating { HStack { ProgressView().controlSize(.small); Text("正在处理…").font(.system(size:12)); Spacer() }.padding(.horizontal,13).padding(.bottom,8) }
             if let error = session.errorMessage { Text(error).font(.system(size:11)).foregroundStyle(.orange).fixedSize(horizontal:false,vertical:true).padding(.horizontal,13).padding(.bottom,6) }
             if !session.candidates.isEmpty {
                 ScrollViewReader { proxy in
@@ -245,14 +264,14 @@ private struct CandidateView: View {
             if session.buffersText {
                 Divider().opacity(0.6)
                 HStack {
-                    Text(session.isInEditor ? "空格选词 · Enter 原样输入 · Shift 中/英" : session.translation != nil ? "Enter 英文上屏 · Esc 修改中文" : !session.snapshot.input.isEmpty ? "空格选词 · Enter 原样输入" : session.asciiMode ? "英文输入 · Shift 切回中文" : "Enter 中文上屏 · Shift 中/英").font(.system(size:10)).foregroundStyle(.secondary)
+                    Text(session.engine.isLiteralInput ? "空格或 Enter 确认原文" : session.isInEditor ? "空格选词 · Enter 原样输入 · Shift 中/英" : session.translation != nil ? "Enter 结果上屏 · Esc 修改原文" : !session.snapshot.input.isEmpty ? "空格选词 · Enter 原样输入" : session.asciiMode ? "英文输入 · Shift 切回中文" : "Enter 原文上屏 · Shift 中/英").font(.system(size:10)).foregroundStyle(.secondary)
                     Spacer()
                     if !session.isInEditor && session.translation == nil && !session.isTranslating {
                         Button { session.requestTranslation() } label: {
-                            Text(session.hasPendingInput ? "先完成选词" : "翻译整句 ⌃↵")
+                            Text(session.hasPendingInput ? (session.engine.isLiteralInput ? "先确认原文" : "先完成选词") : "执行 ⌃↵")
                                 .font(.system(size:11)).foregroundStyle(session.canRequestTranslation ? purple : .secondary)
                         }.buttonStyle(.plain).disabled(!session.canRequestTranslation)
-                            .help(session.hasPendingInput ? "还有未确认的输入，请先完成选词再按 Ctrl + Enter" : "翻译已确认的整段内容")
+                            .help(session.hasPendingInput ? (session.engine.isLiteralInput ? "请先按空格或 Enter 确认原文，再按 Ctrl + Enter" : "还有未确认的输入，请先完成选词再按 Ctrl + Enter") : "\(session.candidateAction.name)：处理已确认的整段内容")
                     }
                 }.padding(.horizontal,13).padding(.vertical,9)
             }

@@ -14,9 +14,9 @@ import InputMethodKit
         if !FileManager.default.fileExists(atPath:cache.path) { try FileManager.default.copyItem(at:user.appendingPathComponent("build"),to:cache) }
         defer { try? FileManager.default.removeItem(at:user) }
         let settings = ConfigurationStore.shared
-        let previous = (settings.translateEnabled,settings.pinyinLayout,settings.editorShortcut)
-        settings.translateEnabled = true; settings.pinyinLayout = .fullPinyin; settings.editorShortcut = .standard
-        defer { settings.translateEnabled = previous.0; settings.pinyinLayout = previous.1; settings.editorShortcut = previous.2 }
+        let previous = (settings.translateEnabled,settings.pinyinLayout,settings.editorShortcut,settings.selectedActionID)
+        settings.translateEnabled = true; settings.pinyinLayout = .fullPinyin; settings.editorShortcut = .standard; settings.selectedActionID = "english"
+        defer { settings.translateEnabled = previous.0; settings.pinyinLayout = previous.1; settings.editorShortcut = previous.2; settings.selectedActionID = previous.3 }
         let server = IMKServer(name:"FangCunEditorTests_"+UUID().uuidString,bundleIdentifier:Bundle.main.bundleIdentifier!)!
         let client = TextClient(); client.text.string = "前缀：尾部"; client.text.setSelectedRange(NSRange(location:3,length:0))
         let controller = TTInputController(server:server,delegate:nil,client:client)!
@@ -39,6 +39,13 @@ import InputMethodKit
                 try await Task.sleep(nanoseconds:25_000_000)
             }
             check(!editor.isHandingOff,"异步输入交接在时限内完成")
+        }
+        func settleTranslation(_ state:CompositionSession) async throws {
+            for _ in 0..<150 {
+                if !state.isTranslating { return }
+                try await Task.sleep(nanoseconds:20_000_000)
+            }
+            check(false,"模型请求在时限内完成：" + (state.errorMessage ?? "等待响应"))
         }
         func closeDraft() async throws { editor.session?.discardPendingInput(); editor.session?.replaceEditorText("关闭测试",selection:NSRange(location:4,length:0)); editor.commitSource(); try await tick() }
 
@@ -153,12 +160,38 @@ import InputMethodKit
         check(s.markedText == prePaste,"尚未选词时粘贴不破坏合成状态")
         key("",53)
         check(!s.hasPendingInput && s.draft.contains("🧭") && editor.isVisible,"Esc 优先取消拼音，保留原选区与编辑窗")
+        s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
+        type("code.aliyun.com/a-b?x=1+2")
+        let address = "code.aliyun.com/a-b?x=1+2"
+        check(editor.source.string == "头"+address+"尾" && s.snapshot.input == address && s.engine.isLiteralInput,"编辑区网址保持原始字母和符号，插入在真实草稿光标位置")
+        key("\r",36,[.control])
+        check(s.hasPendingInput && !s.isTranslating && s.markedText == "头"+address+"尾","编辑区未确认网址不执行动作，不丢前后文字")
+        key(" ",49)
+        check(s.draft == "头"+address+"尾" && !s.hasPendingInput && !s.engine.isLiteralInput,"编辑区空格确认完整原文，恢复中文输入")
+        key("\r",36)
+        check(s.draft == "头"+address+"\n尾","网址确认后的 Enter 仍在真实光标处换行")
+        type("code.aliyun.com"); key("\t",48)
+        check(!s.hasPendingInput && s.draft == "头"+address+"\ncode.aliyun.com\t尾","编辑区 Tab 确认网址并在当前位置插入制表符")
+        s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
+        type("https"); key(":",41,[.shift])
+        check(s.snapshot.input == "https:" && s.draft == "头尾" && editor.source.string == "头https:尾","编辑区 Shift+冒号保留协议前缀，不自动确认到草稿")
+        type("//code.aliyun.com:8443/a?x=1+2")
+        let secureAddress = "https://code.aliyun.com:8443/a?x=1+2"
+        key("\r",36)
+        check(!s.hasPendingInput && s.draft == "头"+secureAddress+"尾","编辑区 Enter 完整确认含协议、端口与查询参数的网址")
+        for text in ["test@example.com","foo_bar_v2","src/main.swift","C:\\path\\file","cmd|grep","func(a,b)","data[0]","obj{key}","tag<value>","var$value","path~backup","hello,world!"] {
+            s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
+            type(text)
+            check(s.snapshot.input == text && s.draft == "头尾" && editor.source.string == "头"+text+"尾","编辑区 \(text)：符号不提前确认，不丢前后文字")
+            key(" ",49)
+            check(!s.hasPendingInput && s.draft == "头"+text+"尾","编辑区 \(text)：空格完整确认原文")
+        }
         s.replaceEditorText("待译内容",selection:NSRange(location:4,length:0))
         var requests = 0
         s.configuration = { ModelConfiguration(endpoint:"http://127.0.0.1:18887/v1",model:"editor-test") }
         s.readKey = { _ in requests += 1; return "synthetic-key" }
         key("\r",36,[.control]); key("\r",36,[.control])
-        try await Task.sleep(nanoseconds:500_000_000)
+        try await settleTranslation(s)
         check(requests == 1 && s.translation == "Hello.","真实客户端请求模拟兼容接口，只主动请求一次")
         editor.result.setSelectedRange(NSRange(location:0,length:editor.result.string.utf16.count))
         editor.result.insertText("Edited result.",replacementRange:editor.result.selectedRange())
@@ -234,7 +267,7 @@ import InputMethodKit
         mixed.replaceEditorText(String(repeating:"长文翻译内容。",count:700),selection:NSRange(location:0,length:0))
         mixed.configuration = { ModelConfiguration(endpoint:"http://127.0.0.1:18887/v1",model:"editor-test") }
         mixed.readKey = { _ in "synthetic-key" }
-        mixed.requestTranslation(); try await Task.sleep(nanoseconds:500_000_000)
+        mixed.requestTranslation(); try await settleTranslation(mixed)
         check(mixed.translation == "Hello." && mixed.draft.count > 4000,"超过原 4,000 字限制的长文能一次主动翻译")
         editor.result.selectAll(nil)
         editor.result.insertText("Long document result.",replacementRange:editor.result.selectedRange())
@@ -337,7 +370,7 @@ import InputMethodKit
 
         for mode in ["window", "result", "original"] {
             let translated = try await shortcutDraft()
-            translated.requestTranslation(); try await Task.sleep(nanoseconds:500_000_000)
+            translated.requestTranslation(); try await settleTranslation(translated)
             precondition(translated.translation == "Hello.")
             translated.editTranslation("Edited English 🧭\nSecond line.")
             editor.window.makeFirstResponder(mode == "window" ? editor.source : editor.result)
@@ -349,7 +382,7 @@ import InputMethodKit
             check(!editor.hasDraft && !editor.isVisible && shortcutClient.text.string == "头：\(expected)：尾" && shortcutRequests == before,"\(mode) 焦点快捷上屏选定全文、自动收起且不额外请求")
         }
         let emptyResult = try await shortcutDraft()
-        emptyResult.requestTranslation(); try await Task.sleep(nanoseconds:500_000_000)
+        emptyResult.requestTranslation(); try await settleTranslation(emptyResult)
         precondition(emptyResult.translation != nil)
         emptyResult.editTranslation("")
         _ = editor.window.performKeyEquivalent(with:event("\r",36,[.command]))
@@ -550,7 +583,7 @@ import InputMethodKit
         settings.editorShortcut = custom
         check(custom.matches(event("e",14,[.control,.option])) && !custom.matches(event("e",14,[.control,.option,.shift])),"自定义快捷键精确匹配修饰键")
         check(EditorShortcut.recording(event("e",14,[.control,.shift])) == nil,"录制快捷键不能占用已有译英开关")
-        settings.editorShortcut = .standard
+        settings.editorShortcut = .standard; settings.selectedActionID = "english"
         check(EditorShortcut.standard.matches(event("\r",76,[.control,.shift])),"数字键盘 Enter 也能打开编辑区")
         print("ALL EDITOR TESTS PASSED")
     }

@@ -9,10 +9,21 @@ final class TTInputController: IMKInputController {
     private var activeClient: (any IMKTextInput)?
     private var isActive = false
     private var shiftTap = ShiftTap()
-    private var nativeModeID: String?
     private let inputSessionID = UUID()
     private var observingChanges = false
     private let inputContext = ContinuousInputContext()
+    private var diagnosticEvents = 0
+    private func diagnose(_ event:String,client:(any IMKTextInput)?,fields:[String:Any] = [:]) {
+        guard UserDefaults(suiteName:"com.fangcun.inputmethod.FangCun")?.bool(forKey:"inputDiagnosticsEnabled") == true else { return }
+        var details = fields
+        details["session"] = inputSessionID.uuidString
+        details["bundle"] = client?.bundleIdentifier() ?? ""
+        details["active"] = isActive
+        details["ascii"] = session?.asciiMode ?? false
+        details["pending"] = session?.hasPendingInput ?? false
+        details["source"] = InputSourceStatus.currentID
+        EditorDiagnostics.record("ime-"+event,details)
+    }
     var contextStatus: (active:Bool,dirty:Bool,reason:String) {
         (session?.contextActive ?? false,inputContext.dirty,inputContext.reason)
     }
@@ -37,7 +48,7 @@ final class TTInputController: IMKInputController {
             if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID && !InputSourceStatus.isOurMode(InputSourceStatus.currentID) { return false }
             self.session = state; self.activeClient = client; self.isActive = true
             self.bind(state)
-            state.endEditor(); self.refresh(); return true
+            state.endEditor(); state.refreshCandidateAction(); self.refresh(); return true
         }
     }
     private func observeHost(_ client:any IMKTextInput) {
@@ -54,6 +65,11 @@ final class TTInputController: IMKInputController {
         guard let client = activeClient, !DraftEditor.isInternalClient(client) else { return }
         openEditor(); DraftEditor.shared.openQuestion()
     }
+    func openAIQuestionFromStatus() -> Bool {
+        guard let client = activeClient, !DraftEditor.isInternalClient(client) else { return false }
+        openAIQuestion()
+        return DraftEditor.shared.hasDraft
+    }
     private func preserveEditorDraft() {
         if let session, session.retainsDraft, !session.isInEditor, !session.markedText.isEmpty, !DraftEditor.shared.hasDraft { detachEditor(present:false) }
     }
@@ -69,6 +85,8 @@ final class TTInputController: IMKInputController {
         MainActor.assumeIsolated { activate(sender) }
     }
     private func activate(_ sender: Any!) {
+        diagnosticEvents = 0
+        diagnose("activate",client:sender as? any IMKTextInput,fields:["clientAvailable":sender is any IMKTextInput])
         guard let client = sender as? any IMKTextInput else { NSLog("方寸输入法：系统未提供文本客户端"); return }
         inputContext.reset(); session?.setContext(nil)
         observeHost(client)
@@ -78,8 +96,6 @@ final class TTInputController: IMKInputController {
                 session = try newSession()
             } catch { NSLog("方寸输入法：拼音初始化失败"); return }
         }
-        // macOS may deliver its initial mode before activateServer, which
-        // already creates the session. Observers still belong to this controller.
         if !observingChanges {
             observingChanges = true
 #if CONTEXT_PROBE
@@ -88,19 +104,15 @@ final class TTInputController: IMKInputController {
             }
 #endif
             NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
+            NotificationCenter.default.addObserver(self,selector:#selector(candidateActionChanged),name:.candidateActionChanged,object:ConfigurationStore.shared)
+            NotificationCenter.default.addObserver(self,selector:#selector(candidateActionChanged),name:.aiActionsChanged,object:ConfigurationStore.shared)
             NotificationCenter.default.addObserver(self,selector:#selector(pinyinLayoutChanged),name:.pinyinLayoutChanged,object:nil)
             NotificationCenter.default.addObserver(self,selector:#selector(contextSettingChanged),name:.contextAwarenessChanged,object:nil)
             DistributedNotificationCenter.default().addObserver(self,selector:#selector(inputSourceChanged),name:Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),object:nil)
         }
-        if Bundle.main.bundleIdentifier == InputSourceStatus.bundleID {
-            let source = InputSourceStatus.currentID
-            if InputSourceStatus.isOurMode(source) {
-                nativeModeID = source
-                session?.setASCIIMode(source == InputSourceStatus.englishModeID)
-            }
-        }
-        pinyinLayoutChanged()
+        pinyinLayoutChanged(); candidateActionChanged()
         refresh()
+        diagnose("activated",client:client)
     }
     nonisolated override func deactivateServer(_ sender: Any!) {
         MainActor.assumeIsolated { session?.invalidateContext("focus-lost",preserveHighlight:true); shiftTap.reset(); preserveEditorDraft(); session?.flushOriginal(); panel.orderOut(nil); isActive = false; activeClient = nil }
@@ -114,6 +126,15 @@ final class TTInputController: IMKInputController {
     }
     private func process(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event else { return false }
+        if diagnosticEvents < 21 { diagnosticEvents += 1 }
+        if diagnosticEvents <= 20 {
+            var fields:[String:Any] = ["type":event.type.rawValue,"clientAvailable":sender is any IMKTextInput]
+            if event.type == .keyDown {
+                fields["charactersEmpty"] = event.characters?.isEmpty ?? true
+                fields["unmodifiedEmpty"] = event.charactersIgnoringModifiers?.isEmpty ?? true
+            }
+            diagnose("event",client:sender as? any IMKTextInput,fields:fields)
+        }
         if event.type == .keyDown, !ConfigurationStore.shared.editorShortcut.matches(event), let client = sender as? any IMKTextInput {
             DraftEditor.shared.hostWillProcessInput(client,sessionID:inputSessionID)
         }
@@ -154,6 +175,7 @@ final class TTInputController: IMKInputController {
             session.setContext(prefix.map { $0 + session.draft })
         } else { session.invalidateContext("disabled-or-ineligible") }
         let handled = session.handle(key:key,control:flags.contains(.control),shift:flags.contains(.shift),command:flags.contains(.command),option:flags.contains(.option))
+        if diagnosticEvents <= 20 { diagnose("handled",client:sender as? any IMKTextInput,fields:["handled":handled]) }
         // Host navigation/shortcuts also invalidate the badge. Repaint only
         // the panel here, without rewriting the host's selection/marked text.
         if !handled { showCandidates() }
@@ -161,15 +183,10 @@ final class TTInputController: IMKInputController {
     }
     private func refresh() {
         guard isActive, let session, !session.isInEditor, let client = activeClient else { return }
+        AppPresence.shared.updateInputLanguage(asciiMode:session.asciiMode,controller:self)
         guard !DraftEditor.shared.suspendsHostUpdates(in:client,sessionID:inputSessionID) else { return }
-        let mode = session.asciiMode ? InputSourceStatus.englishModeID : InputSourceStatus.modeID
-        if nativeModeID != mode {
-            // Both modes must be visible in the system's input-mode list;
-            // a hidden mode can change TIS state without updating the menu icon.
-            // Record first because macOS may echo setValue synchronously.
-            nativeModeID = mode
-            client.selectMode(mode)
-        }
+        // Shift changes only this session's language. Selecting a native mode
+        // here would expose English as a second system input source.
         let text = session.markedText
         let marked = client.markedRange()
         // Some clients return a zero-length marked range when there is no
@@ -183,7 +200,7 @@ final class TTInputController: IMKInputController {
               !DraftEditor.shared.suspendsHostUpdates(in:client,sessionID:inputSessionID) else { return }
         var rect = NSRect.zero
         _ = client.attributes(forCharacterIndex:0,lineHeightRectangle:&rect)
-        panel.show(session:session,anchor:rect,expand:{ [weak self] in self?.openEditor() },ask:{ [weak self] in self?.openAIQuestion() }) { SettingsWindow.shared.show() }
+        panel.show(session:session,anchor:rect,expand:{ [weak self] in self?.openEditor() },ask:{ [weak self] in self?.openAIQuestion() },configureAction:{ SettingsWindow.shared.showCandidateActions() }) { SettingsWindow.shared.show() }
     }
     deinit { NotificationCenter.default.removeObserver(self); DistributedNotificationCenter.default().removeObserver(self) }
 #if CONTEXT_PROBE
@@ -208,16 +225,6 @@ final class TTInputController: IMKInputController {
         ContextProbe.sample(notice,client:client,hasComposition:session?.markedText.isEmpty == false,session:inputSessionID,contextStatus:contextStatus)
     }
 #endif
-    nonisolated override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
-        guard tag == Int(kTextServiceInputModePropertyTag), let mode = value as? String,
-              InputSourceStatus.isOurMode(mode) else { super.setValue(value,forTag:tag,client:sender); return }
-        MainActor.assumeIsolated {
-            nativeModeID = mode
-            if let client = sender as? any IMKTextInput { activeClient = client }
-            if session == nil { session = try? newSession() }
-            session?.setASCIIMode(mode == InputSourceStatus.englishModeID)
-        }
-    }
     @objc private func inputSourceChanged() {
         let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         guard let pointer = TISGetInputSourceProperty(source,kTISPropertyInputSourceID) else { return }
@@ -234,6 +241,7 @@ final class TTInputController: IMKInputController {
         }
     }
     @objc private func configurationChanged() { session?.configurationChanged() }
+    @objc private func candidateActionChanged() { session?.refreshCandidateAction() }
     @objc private func contextSettingChanged() { session?.invalidateContext("setting-changed"); refresh() }
     @objc private func pinyinLayoutChanged() {
         do { try session?.requestPinyinLayout(ConfigurationStore.shared.pinyinLayout) }
@@ -259,9 +267,24 @@ final class TTInputController: IMKInputController {
         let editor = NSMenuItem(title:DraftEditor.shared.hasDraft ? "继续临时编辑…" : "临时编辑区…",action:#selector(openEditor),keyEquivalent:ConfigurationStore.shared.editorShortcut.key)
         editor.keyEquivalentModifierMask = ConfigurationStore.shared.editorShortcut.flags; editor.target = self; menu.addItem(editor)
         let ask = NSMenuItem(title:"问 AI…",action:#selector(openAIQuestion),keyEquivalent:""); ask.target = self; menu.addItem(ask)
-        let toggle = NSMenuItem(title:"译英",action:#selector(toggleTranslation),keyEquivalent:""); toggle.target = self; toggle.state = session?.translateEnabled == true ? .on : .off; menu.addItem(toggle)
+        let currentAction = session?.candidateAction ?? ConfigurationStore.shared.candidateAction
+        let toggle = NSMenuItem(title:currentAction.candidateLabel,action:#selector(toggleTranslation),keyEquivalent:""); toggle.target = self; toggle.state = session?.translateEnabled == true ? .on : .off; menu.addItem(toggle)
+        let candidateActions = NSMenuItem(title:"候选框 AI 动作",action:nil,keyEquivalent:"")
+        let actionMenu = NSMenu()
+        for action in ConfigurationStore.shared.actions {
+            let item = NSMenuItem(title:action.name,action:#selector(selectCandidateAction(_:)),keyEquivalent:"")
+            item.target = self; item.representedObject = action.id; item.state = action.id == currentAction.id ? .on : .off
+            actionMenu.addItem(item)
+        }
+        candidateActions.submenu = actionMenu; menu.addItem(candidateActions)
         let settings = NSMenuItem(title:"设置…",action:#selector(showPreferences(_:)),keyEquivalent:""); settings.target = self; menu.addItem(settings)
         return menu
+    }
+    @objc private func selectCandidateAction(_ sender:NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let action = ConfigurationStore.shared.actions.first(where:{$0.id == id}) else { return }
+        if let session { session.setCandidateAction(action) }
+        else { ConfigurationStore.shared.candidateActionID = id }
     }
     @objc private func selectPinyinLayout(_ sender: NSMenuItem) {
         guard PinyinLayout.allCases.indices.contains(sender.tag) else { return }
