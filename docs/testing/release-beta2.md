@@ -31,7 +31,7 @@ Apple Silicon 通过交叉编译和包检查，尚未真机运行；macOS 13、�
 
 ## 同日 Developer ID 签名更新
 
-应用代码和 build 保持不变，使用 Developer ID Application: yunxia gao（RCVC2JSJY7）对应用、Rime 动态库及最终 DMG 正式签名，包含安全时间戳。应用和动态库启用 Hardened Runtime，应用仅附加 JavaScriptCore 所需 `com.apple.security.cs.allow-jit` 权限，未禁用动态库验证。
+应用代码和 build 保持不变，对应用、Rime 动态库及最终 DMG 正式签名。应用和动态库启用 Hardened Runtime，应用仅附加 JavaScriptCore 所需 `com.apple.security.cs.allow-jit` 权限，未禁用动态库验证。
 
 两份 DMG 再次通过原有完整性、挂载签名、架构、资源和摘要检查，并额外核对 Team ID、证书链、安全时间戳与运行时标志。Intel 发行包直接启动本机凭据探针成功。
 
