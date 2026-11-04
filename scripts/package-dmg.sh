@@ -39,7 +39,7 @@ for CHIP in AppleSilicon Intel; do
         AppleSilicon) ARCH=arm64; LABEL='Apple Silicon 版（M 系列芯片，arm64）' ;;
         Intel) ARCH=x86_64; LABEL='Intel 版（Intel 处理器，x86_64）' ;;
     esac
-    NAME="FangCun-$VERSION-build$BUILD-$CHIP-preview"
+    NAME="FangCun-$VERSION-build$BUILD-$CHIP-installer"
     PACKAGE="$STAGING/$CHIP"
     DIST_APP="$PACKAGE/FangCun.app"
     mkdir -p "$PACKAGE"
@@ -64,15 +64,28 @@ for CHIP in AppleSilicon Intel; do
         xcrun stapler validate "$DIST_APP"
         spctl --assess --type execute --verbose=4 "$DIST_APP"
     fi
+    INSTALLER="$PACKAGE/安装方寸输入法.app"
+    ./scripts/build-installer.sh "$DIST_APP" "$INSTALLER" "$ARCH"
+    codesign "${SIGN_FLAGS[@]}" "$INSTALLER"
+    codesign --verify --deep --strict "$INSTALLER"
+    if [ -n "$NOTARY_PROFILE" ]; then
+        ditto -c -k --keepParent "$INSTALLER" "$STAGING/$CHIP-installer-notary.zip"
+        notarize "$STAGING/$CHIP-installer-notary.zip" "$PWD/.build/notary-build$BUILD-$CHIP-installer.json"
+        xcrun stapler staple "$INSTALLER"
+        xcrun stapler validate "$INSTALLER"
+        spctl --assess --type execute --verbose=4 "$INSTALLER"
+    fi
+    # Expose only the installation entry point, keeping the signed payload inside it.
+    rm -rf "$DIST_APP"
     printf '方寸输入法 %s · build %s\n下载版本：%s\n\n' "$VERSION" "$BUILD" "$LABEL" > "$PACKAGE/INSTALL.txt"
     if [ -n "$NOTARY_PROFILE" ]; then
-        echo '应用和 DMG 使用 Developer ID 正式签名，并通过 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
+        echo '输入法、安装器和 DMG 使用 Developer ID 正式签名，并通过 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
     elif [ "$SIGN_ID" != - ]; then
-        echo '应用和 DMG 使用 Developer ID 正式签名，尚未通过 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
+        echo '输入法、安装器和 DMG 使用 Developer ID 正式签名，尚未通过 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
     else
         echo '本包采用 ad hoc 临时代码签名，没有 Developer ID 签名或 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
     fi
-    cat docs/distribution-preview.txt >> "$PACKAGE/INSTALL.txt"
+    cat docs/distribution-installer.txt >> "$PACKAGE/INSTALL.txt"
     # Input methods belong in Library/Input Methods, so there is no Applications alias.
     hdiutil create -volname "FangCun $VERSION $CHIP" -srcfolder "$PACKAGE" \
         -format UDZO -fs HFS+ "$STAGING/images/$NAME.dmg"
@@ -91,7 +104,7 @@ for CHIP in AppleSilicon Intel; do
 done
 # Expose artifacts only after both images have passed validation.
 for CHIP in AppleSilicon Intel; do
-    NAME="FangCun-$VERSION-build$BUILD-$CHIP-preview"
+    NAME="FangCun-$VERSION-build$BUILD-$CHIP-installer"
     mv "$STAGING/images/$NAME.dmg" "$STAGING/images/$NAME.dmg.sha256" dist/
     echo "DMG：$PWD/dist/$NAME.dmg"
 done

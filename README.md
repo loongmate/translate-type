@@ -4,12 +4,12 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 
 ## 下载预览版
 
-[0.1.0-beta.2（build 42）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.2) 提供 macOS 13+ 的 DMG：
+[0.1.0-beta.3（build 43）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.3) 提供 macOS 13+ 的自动安装 DMG：
 
-- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.2/FangCun-0.1.0-build42-AppleSilicon-preview.dmg)
-- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.2/FangCun-0.1.0-build42-Intel-preview.dmg)
+- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.3/FangCun-0.1.0-build43-AppleSilicon-installer.dmg)
+- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.3/FangCun-0.1.0-build43-Intel-installer.dmg)
 
-打开 DMG 后，将 `FangCun.app` 复制到 `~/Library/Input Methods/`，再打开已安装的应用；不要拖入「应用程序」文件夹。应用、Rime 动态库和 DMG 已有 Developer ID 正式签名；两种架构的应用与 DMG 均已通过 Apple 公证并附加票据。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.2.md)。
+打开 DMG，双击「安装方寸输入法」并点击安装。安装器自动复制到当前用户的输入法目录、注册并尝试启用，完成后点击「开始使用」。升级保留配置和词库；若系统尚未发现输入源，会明确提示重新登录。输入法、安装器和 DMG 均有 Developer ID 正式签名并通过 Apple 公证。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.3.md)。
 
 ## 本机构建和安装
 

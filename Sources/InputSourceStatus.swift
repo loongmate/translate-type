@@ -11,6 +11,7 @@ enum InputSourceStatus {
 
     struct RegistrationError: LocalizedError {
         let message: String
+        var requiresRelogin = false
         var errorDescription: String? { message }
     }
     static func identifier(_ source: TISInputSource) -> String {
@@ -46,7 +47,7 @@ enum InputSourceStatus {
         try register(at: url)
         for id in [bundleID, modeID] {
             guard let source = sources().first(where: { identifier($0) == id }) else {
-                throw RegistrationError(message: "系统尚未识别方寸输入法，请重新登录后再添加。")
+                throw RegistrationError(message: "系统尚未识别方寸输入法，请重新登录后再添加。",requiresRelogin:true)
             }
             if !flag(source, kTISPropertyInputSourceIsEnabled) {
                 let status = TISEnableInputSource(source)
@@ -54,7 +55,7 @@ enum InputSourceStatus {
             }
         }
         guard isAvailable else {
-            throw RegistrationError(message: "macOS 未自动启用方寸输入法。请打开系统键盘设置，在「编辑 → ＋ → 简体中文」添加「方寸输入法」。旧输入法仍保留。")
+            throw RegistrationError(message: "macOS 未自动启用方寸输入法。请打开系统键盘设置，在「编辑 → ＋ → 简体中文」添加「方寸输入法」。旧输入法仍保留。",requiresRelogin:true)
         }
         // English is session state within the single Chinese input source.
         // Retire the previously enabled English entry after Hans is available.

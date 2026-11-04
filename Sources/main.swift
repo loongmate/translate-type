@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if server == nil { throw AppError.message("无法启动系统输入法服务。") }
             NSLog("TranslateType input method server ready")
             AppPresence.shared.start()
-            if CommandLine.arguments.contains("--settings") { SettingsWindow.shared.show() }
+            if CommandLine.arguments.contains("--settings") || !InputSourceStatus.isAvailable { SettingsWindow.shared.show() }
             if CommandLine.arguments.contains("--enable-input-source") { SettingsWindow.shared.enableInputSource() }
         } catch {
             let alert = NSAlert(); alert.messageText = "方寸输入法启动失败"; alert.informativeText = error.localizedDescription; alert.runModal(); NSApp.terminate(nil)
