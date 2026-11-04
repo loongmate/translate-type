@@ -39,6 +39,7 @@ for CHIP in AppleSilicon Intel; do
     codesign --force --sign - "$DIST_APP"
     codesign --verify --deep --strict "$DIST_APP"
     printf '下载版本：%s\n\n' "$LABEL" > "$PACKAGE/INSTALL.txt"
+    echo '本包采用 ad hoc 临时代码签名，没有 Developer ID 签名或 Apple 公证。' >> "$PACKAGE/INSTALL.txt"
     cat docs/distribution-preview.txt >> "$PACKAGE/INSTALL.txt"
     ditto -c -k --keepParent "$PACKAGE" "$STAGING/archives/$NAME.zip"
     (cd "$STAGING/archives" && LC_ALL=C shasum -a 256 "$NAME.zip" > "$NAME.zip.sha256")

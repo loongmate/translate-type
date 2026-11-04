@@ -27,4 +27,14 @@
 
 本轮命令日志位于本地 `.build/release-beta2-*.log`，映像验证结果位于 `.build/release-beta2-dmg-verification.json`；未将日志或本机凭据加入源码。
 
-Apple Silicon 通过交叉编译和包检查，尚未真机运行；macOS 13、新账户首次安装、浏览器下载触发的 Gatekeeper 流程尚未验收。发布包保持 ad hoc 预览签名，未做 Apple 公证。
+Apple Silicon 通过交叉编译和包检查，尚未真机运行；macOS 13、新账户首次安装、浏览器下载触发的 Gatekeeper 流程尚未验收。初次发布采用 ad hoc 预览签名；正式签名更新见下文。
+
+## 同日 Developer ID 签名更新
+
+应用代码和 build 保持不变，使用 Developer ID Application: yunxia gao（RCVC2JSJY7）对应用、Rime 动态库及最终 DMG 正式签名，包含安全时间戳。应用和动态库启用 Hardened Runtime，应用仅附加 JavaScriptCore 所需 `com.apple.security.cs.allow-jit` 权限，未禁用动态库验证。
+
+两份 DMG 再次通过原有完整性、挂载签名、架构、资源和摘要检查，并额外核对 Team ID、证书链、安全时间戳与运行时标志。Intel 发行包直接启动本机凭据探针成功。
+
+复制既有测试程序，将 Rime 放入应用 Frameworks 并调整 rpath，使用同一 Developer ID、Hardened Runtime 和权限签名，按每个 suite 独立 mock 服务运行：EditorTests 160 项、CandidateActionTests 32 项、AgentTests 40 项、ScratchpadTests 41 项均通过，覆盖输入、上屏交接、本机命令和文件工具、JavaScriptCore Markdown 及 WebKit 预览。测试日志保存在本机 `.build/signed-smoke-*.log`。
+
+公证尚未完成，未声明 Gatekeeper 首次安装验收通过。签名后 DMG 摘要以发布说明及同名 `.sha256` 为准。
