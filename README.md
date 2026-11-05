@@ -4,12 +4,12 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 
 ## 下载预览版
 
-[0.1.0-beta.4（build 44）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.4) 提供 macOS 13+ 的自动安装 DMG：
+[0.1.0-beta.5（build 45）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.5) 提供 macOS 13+ 的自动安装 DMG：
 
-- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.4/FangCun-0.1.0-build44-AppleSilicon-installer.dmg)
-- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.4/FangCun-0.1.0-build44-Intel-installer.dmg)
+- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.5/FangCun-0.1.0-build45-AppleSilicon-installer.dmg)
+- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.5/FangCun-0.1.0-build45-Intel-installer.dmg)
 
-打开 DMG，双击「安装方寸输入法」并点击安装。安装器自动复制到当前用户的输入法目录、注册并尝试启用，完成后点击「开始使用」。升级保留配置和词库；若系统尚未发现输入源，会明确提示重新登录。输入法、安装器和 DMG 均有 Developer ID 正式签名并通过 Apple 公证。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.4.md)。
+打开 DMG，双击「安装方寸输入法」并点击安装。安装器自动复制到当前用户的输入法目录、注册并尝试启用，首次安装完成后可点击「开始使用」。覆盖升级会显示「需要重新登录」：请先保存所有工作，再退出登录并重新登录，以重建已打开应用的输入会话；只关闭安装器或锁屏无效。升级保留配置和词库。输入法、安装器和 DMG 均有 Developer ID 正式签名并通过 Apple 公证。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.5.md)。
 
 ## 本机构建和安装
 
@@ -22,7 +22,7 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 ./scripts/install.sh
 ```
 
-安装到 `~/Library/Input Methods/FangCun.app`。安装程序注册并尝试启用输入源；若菜单中暂未显示，请在「系统设置 → 键盘 → 文本输入 → 编辑 → ＋ → 简体中文」中添加「方寸输入法」。首次安装可能需要重新登录；应用启动或注册接口成功不代表系统文本会话验证已通过。
+安装到 `~/Library/Input Methods/FangCun.app`。安装程序注册并尝试启用输入源；若菜单中暂未显示，请在「系统设置 → 键盘 → 文本输入 → 编辑 → ＋ → 简体中文」中添加「方寸输入法」。首次安装可能需要重新登录，覆盖升级后应保存工作、退出登录并重新登录，以重建原来应用的输入会话；应用启动或注册接口成功不代表系统文本会话验证已通过。
 
 安装程序只停止本工程已安装的输入法进程，更新时将旧应用保存在 `.build/*-previous-*.snapshot`，不移除其他输入法。安装时会注销工程构建副本在 Launch Services 中的登记，避免系统启动错误路径。
 
@@ -53,7 +53,7 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 - 长候选完整显示并自动换行。超长拼音、中文草稿和译文可在窗口内滚动查看；拼音光标和高亮候选自动保持可见。
 - 从候选窗齿轮或系统输入源菜单打开「设置」。输入方案在「输入」页，模型、API Key、英语翻译偏好在「AI」页，候选框动作在「候选动作」页。也可运行 `open -a FangCun fangcun://settings`。
 
-系统输入菜单中只有一个可选的「方寸输入法」入口，原生图标固定为「方」。Shift 在内部切换中英文，另有一个随语言显示「中／英」的紫色状态图标，仅在选中方寸时出现；点击可选择「问问 AI…」直接进入临时编辑区的问 AI 页面，也可查看状态、打开设置或继续临时编辑。升级时自动停用旧的「方寸输入法 · 英文」入口。可从系统输入法菜单或候选窗齿轮打开设置，也可运行 `open -a FangCun fangcun://settings`。设置窗口打开时，方寸输入法会出现在 Dock 和 Cmd + Tab 应用切换器；关闭设置窗口后回到菜单栏运行。再次从设置入口打开会保留尚未保存的输入内容。切换输入法、切换应用或后台服务重新打开不会自动弹出设置；安装器通过显式设置链接打开设置页。设置顶部展示系统实际可选的输入源状态；注册接口返回成功不代表已启用。
+系统输入菜单中只有一个可选的「方寸输入法」入口，原生图标固定为「方」。Shift 在内部切换中英文，另有一个随语言显示「中／英」的紫色状态图标，仅在选中方寸时出现；点击可选择「问问 AI…」直接进入临时编辑区的问 AI 页面，也可查看状态、打开设置或继续临时编辑。升级时自动停用旧的「方寸输入法 · 英文」入口。可从系统输入法菜单或候选窗齿轮打开设置，也可运行 `open -a FangCun fangcun://settings`。设置窗口打开时，方寸输入法会出现在 Dock 和 Cmd + Tab 应用切换器；关闭设置窗口后回到菜单栏运行。再次从设置入口打开会保留尚未保存的输入内容。切换输入法、切换应用或后台服务重新打开不会自动弹出设置；首次安装完成时，安装器通过显式设置链接打开设置页；覆盖升级需重新登录后再使用。设置顶部展示系统实际可选的输入源状态；注册接口返回成功不代表已启用。
 
 打字、选词、输入标点或停顿均不调用模型。请求期间阻止重复触发；修改原文、切换动作、切换输入源或离开文本会话会取消请求，过期响应无法上屏。失败保留原文，不自动重试。当前会话中相同文字、动作及模型配置可复用最近结果。
 

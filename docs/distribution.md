@@ -1,6 +1,6 @@
 # 方寸输入法发布方案
 
-当前版本为 **0.1.0-beta.4 / build 44**，提供带原生自动安装器的两种架构 DMG，见 [安装与发布说明](releases/v0.1.0-beta.4.md)。安装器以当前登录用户身份安装到 `~/Library/Input Methods/`，备份旧版、注册和启用输入源，明确区分可开始使用、需要重新登录和失败回滚。
+当前版本为 **0.1.0-beta.5 / build 45**，提供带原生自动安装器的两种架构 DMG，见 [安装与发布说明](releases/v0.1.0-beta.5.md)。安装器以当前登录用户身份安装到 `~/Library/Input Methods/`，备份旧版、注册和启用输入源，覆盖升级或发现旧输入会话时要求重新登录，首次安装无旧会话时才提供直接开始使用；失败时尝试回滚。
 
 ```sh
 FANGCUN_ARCHS='x86_64 arm64' ./scripts/build.sh
@@ -8,7 +8,7 @@ FANGCUN_SIGN_ID='Developer ID Application: Your Name (TEAMID)' \
 FANGCUN_NOTARY_PROFILE='your-notary-profile' ./scripts/package-dmg.sh
 ```
 
-生成 `dist/FangCun-0.1.0-build44-{AppleSilicon,Intel}-installer.dmg` 及各自 `.sha256`。输入法先签名、公证并附加票据，再装入分别编译的 `安装方寸输入法.app`；安装器和最终 DMG 也分别签名、公证及附加票据。安装器不需要 Developer ID Installer 证书或管理员权限。
+生成 `dist/FangCun-0.1.0-build45-{AppleSilicon,Intel}-installer.dmg` 及各自 `.sha256`。输入法先签名、公证并附加票据，再装入分别编译的 `安装方寸输入法.app`；安装器和最终 DMG 也分别签名、公证及附加票据。安装器不需要 Developer ID Installer 证书或管理员权限。
 
 以下保留 beta.2 及早期发布规划，反映当时的产物和环境。
 

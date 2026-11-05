@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class InstallerDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window:NSWindow!
-    private let status = NSTextField(wrappingLabelWithString:"自动安装到当前账户并添加到系统输入法。\n保留现有配置、词库、API Key 和临时编辑器恢复稿。\n\n更新前，请先保存方寸中尚未提交的文字。")
+    private let status = NSTextField(wrappingLabelWithString:"自动安装到当前账户并添加到系统输入法。\n保留现有配置、词库、API Key 和临时编辑器恢复稿。\n\n覆盖升级后需要退出登录并重新登录。\n请先保存各应用中尚未提交的文字。")
     private let primary = NSButton(title:"安装方寸输入法",target:nil,action:nil)
     private let secondary = NSButton(title:"取消",target:nil,action:nil)
     private let spinner = NSProgressIndicator()
@@ -88,8 +88,8 @@ final class InstallerDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate
                 case .ready:
                     status.stringValue = "安装完成，方寸已添加到系统输入法。\n\n点击「开始使用」切换到方寸，或稍后从系统输入菜单选择「方寸输入法」。设置窗口已打开，可以配置 AI 和拼音方案。"
                     complete = true; primary.title = "开始使用"; primary.isEnabled = true
-                case .needsLogin:
-                    status.stringValue = "应用已安装，macOS 尚未识别新的输入法。\n\n请保存工作，退出登录后重新登录，再在系统输入菜单选择方寸。若仍未出现，请打开方寸设置，点击「添加到系统输入法」。"
+                case .needsLogin(let reason):
+                    status.stringValue = "应用已安装，仍需重新登录。\n\n\(reason)\n\n请先保存所有工作，退出登录后重新登录，再从系统输入菜单选择「方寸输入法」。只关闭安装器或锁屏不会重建输入会话。"
                     primary.title = "需要重新登录"; primary.isEnabled = false
                 }
                 window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)

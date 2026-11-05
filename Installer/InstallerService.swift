@@ -5,9 +5,9 @@ import Darwin
 @MainActor protocol InstallerSystem {
     var currentID:String { get }
     func prepareUpdate(previousID:String) throws
-    func stop(at url:URL?) async throws
+    func stop(at url:URL?) async throws -> Bool
     func register(at url:URL,payload:URL) async throws
-    func enable(at url:URL,previousID:String) throws
+    func enable(at url:URL) throws
     func launch(at url:URL) async throws
     func restore(at url:URL?,previousID:String) async throws
     func select() throws
@@ -65,14 +65,14 @@ final class InstallerService {
         try system.prepareUpdate(previousID:previousID)
         var filesReplaced = false
         do {
-            try await system.stop(at:transaction.previous)
+            let stoppedOldProcess = try await system.stop(at:transaction.previous)
             try await Task.detached { try transaction.replace() }.value
             filesReplaced = true
             try await system.register(at:transaction.destination,payload:payload)
             progress("正在添加到系统输入法…")
             var pending: Error?
             for attempt in 0..<10 {
-                do { try system.enable(at:transaction.destination,previousID:previousID); pending = nil; break }
+                do { try system.enable(at:transaction.destination); pending = nil; break }
                 catch {
                     pending = error
                     if (error as? InputSourceStatus.RegistrationError)?.requiresRelogin != true { throw error }
@@ -83,15 +83,19 @@ final class InstallerService {
                 // A new input method may only be discovered at the next login.
                 // An update keeps the working prior installation instead.
                 if transaction.previous != nil { throw pending }
-                try await system.launch(at:transaction.destination)
                 return .needsLogin(pending.localizedDescription)
             }
+            // Killing/relaunching an IME does not reconnect the input contexts
+            // held by applications that were already running. Do not claim a
+            // live upgrade is ready just because TIS can select the new files.
+            if transaction.previous != nil || stoppedOldProcess || InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) {
+                return .needsLogin("覆盖升级需要重新建立各应用的输入会话，才能使用新版方寸。")
+            }
             try await system.launch(at:transaction.destination)
-            if InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) { try? system.select() }
             return .ready
         } catch {
             do {
-                if filesReplaced { try await system.stop(at:transaction.destination) }
+                if filesReplaced { _ = try await system.stop(at:transaction.destination) }
                 try await Task.detached { try transaction.rollback() }.value
                 try await system.restore(at:transaction.previous,previousID:previousID)
             } catch { throw InstallFailure(message:"安装未完成，自动恢复也遇到问题：\(error.localizedDescription)") }
@@ -103,6 +107,9 @@ final class InstallerService {
 
 @MainActor final class MacInstallerSystem: InstallerSystem {
     private let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    private let processes:InstallerProcesses
+    private var stoppedPIDs:Set<pid_t> = []
+    init(processes:InstallerProcesses? = nil) { self.processes = processes ?? InstallerProcesses() }
     var currentID:String { InputSourceStatus.currentID }
     func prepareUpdate(previousID:String) throws {
         if InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) {
@@ -115,8 +122,11 @@ final class InstallerService {
         _ = try? await Task.detached { try InstallerService.command(registrar,["-u",payload.path]) }.value
         _ = try await Task.detached { try InstallerService.command(registrar,["-f",url.path]) }.value
     }
-    func enable(at url:URL,previousID:String) throws {
-        try InputSourceStatus.enable(at:url,replacingCurrentID:previousID)
+    func enable(at url:URL) throws {
+        // prepareUpdate has already selected an ASCII fallback. Use that
+        // current source when retiring legacy modes so migration cannot select
+        // FangCun again while old host applications still hold IMK contexts.
+        try InputSourceStatus.enable(at:url)
     }
     func restore(at url:URL?,previousID:String) async throws {
         if let url {
@@ -137,33 +147,27 @@ final class InstallerService {
             _ = TISSelectInputSource(source)
         }
     }
-    func stop(at url:URL?) async throws {
-        guard let url else { return }
-        let applications = NSWorkspace.shared.runningApplications.filter {
-            $0.bundleURL?.standardizedFileURL.resolvingSymlinksInPath() == url.standardizedFileURL.resolvingSymlinksInPath()
-                && ($0.bundleIdentifier == InputSourceStatus.bundleID || InputSourceStatus.legacyBundleIDs.contains($0.bundleIdentifier ?? ""))
-        }
-        for application in applications { _ = application.terminate() }
-        for _ in 0..<30 {
-            if applications.allSatisfy({$0.isTerminated}) { return }
-            try await Task.sleep(nanoseconds:100_000_000)
-        }
-        for application in applications where !application.isTerminated { _ = application.forceTerminate() }
-        for _ in 0..<20 {
-            if applications.allSatisfy({$0.isTerminated}) { return }
-            try await Task.sleep(nanoseconds:100_000_000)
-        }
-        throw InstallFailure(message:"旧版方寸尚未退出，应用未替换。请保存文字并退出方寸后重试。")
+    func stop(at url:URL?) async throws -> Bool {
+        // Even a first install may have an older copy running from Downloads
+        // or a disk image. Stopping just `url` leaves that copy serving IMK.
+        let stopped = try await processes.stopAll()
+        stoppedPIDs.formUnion(stopped)
+        return !stopped.isEmpty
     }
     func launch(at url:URL) async throws {
+        let running = processes.inputMethods()
+        if running.count > 1 || running.contains(where:{ !$0.matchesInstallation(url) || stoppedPIDs.contains($0.pid) }) {
+            stoppedPIDs.formUnion(try await processes.stopAll())
+        }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-        let _:NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
+        let launched:NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
             NSWorkspace.shared.open([URL(string:"fangcun://settings")!],withApplicationAt:url,configuration:config) { app,error in
                 if let app { continuation.resume(returning:app) }
                 else { continuation.resume(throwing:error ?? InstallFailure(message:"无法打开已安装的方寸输入法。")) }
             }
         }
+        try await processes.verifyLaunch(at:url,pid:launched.processIdentifier,stopped:stoppedPIDs)
     }
     func select() throws {
         guard let source = InputSourceStatus.sources(includeDisabled:false).first(where:{ InputSourceStatus.identifier($0) == InputSourceStatus.modeID }),

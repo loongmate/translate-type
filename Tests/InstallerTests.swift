@@ -6,18 +6,20 @@ import AppKit
     var registerFailure = false
     var launchFailure = false
     var stopFailure = false
+    var hadRunningProcesses = false
     var pendingAttempts = 0
     var enableCount = 0
     func prepareUpdate(previousID:String) throws { events.append("prepare") }
-    func stop(at url:URL?) async throws {
+    func stop(at url:URL?) async throws -> Bool {
         events.append("stop")
         if stopFailure { throw InstallFailure(message:"模拟旧进程无法退出") }
+        return hadRunningProcesses
     }
     func register(at url:URL,payload:URL) async throws {
         events.append("register")
         if registerFailure { throw InstallFailure(message:"模拟注册失败") }
     }
-    func enable(at url:URL,previousID:String) throws {
+    func enable(at url:URL) throws {
         events.append("enable"); enableCount += 1
         if enableCount <= pendingAttempts { throw InputSourceStatus.RegistrationError(message:"模拟新会话尚未发现",requiresRelogin:true) }
     }
@@ -80,6 +82,86 @@ final class InstallerFixture {
             }
             return
         }
+        func process(_ pid:pid_t,_ path:String,_ id:String = InputSourceStatus.bundleID) -> InstallerProcess {
+            let url = URL(fileURLWithPath:path)
+            return InstallerProcess(pid:pid,bundleID:id,bundleURL:url,executableURL:url.appendingPathComponent("Contents/MacOS/TranslateType"))
+        }
+        do {
+            var live = [process(101,"/Downloads/TranslateType.app",InputSourceStatus.legacyBundleIDs[0]),process(102,"/Library/Input Methods/FangCun.app"),
+                        process(103,"/Applications/Installer.app","com.translatetype.installer.FangCun"),
+                        process(104,"/Applications/Other.app","org.example.other")]
+            var requests:[pid_t] = []
+            let processes = InstallerProcesses(inventory:{live},requestStop:{ pid,_ in
+                requests.append(pid); live.removeAll {$0.pid == pid}
+            },delay:0)
+            _ = try await MacInstallerSystem(processes:processes).stop(at:nil)
+            check(Set(requests) == [101,102],"首次安装也退出下载目录与安装目录里的全部方寸进程")
+            check(Set(live.map(\.pid)) == [103,104],"退出方寸副本不影响安装器及其他产品")
+        }
+        do {
+            var reads = 0
+            var live = [process(201,"/Downloads/Old.app")]
+            let processes = InstallerProcesses(inventory:{
+                reads += 1
+                if reads == 2 { live.append(process(202,"/Volumes/Old/FangCun.app")) }
+                return live
+            },requestStop:{ pid,_ in live.removeAll {$0.pid == pid} },delay:0)
+            let stopped = try await processes.stopAll()
+            check(stopped == [201,202] && live.isEmpty,"退出期间重新出现的旧副本也被重新枚举并停止")
+        }
+        do {
+            var live = [process(301,"/Downloads/Old.app")]
+            var forced = false
+            let processes = InstallerProcesses(inventory:{live},requestStop:{ pid,force in
+                if force { forced = true; live.removeAll {$0.pid == pid} }
+            },delay:0)
+            _ = try await processes.stopAll()
+            check(forced && live.isEmpty,"拒绝普通退出的旧副本会强制退出并确认进程消失")
+        }
+        do {
+            let processes = InstallerProcesses(inventory:{[process(401,"/Downloads/Old.app")]},requestStop:{_,_ in},delay:0)
+            do { _ = try await processes.stopAll(); check(false,"旧副本仍存活不能继续安装") }
+            catch { check(true,"强制退出仍失败时停止更新并明确报告失败") }
+        }
+        do {
+            let destination = URL(fileURLWithPath:"/Users/test/Library/Input Methods/FangCun.app")
+            let installed = process(501,destination.path)
+            var live = [installed]
+            let processes = InstallerProcesses(inventory:{live},requestStop:{_,_ in},delay:0)
+            try await processes.verifyLaunch(at:destination,pid:501,stopped:[500])
+            check(true,"仅新 PID 且位于准确安装路径的单一进程通过启动验证")
+            live.append(process(502,"/Downloads/Old.app"))
+            do { try await processes.verifyLaunch(at:destination,pid:501,stopped:[]); check(false,"两个进程不能报告安装成功") }
+            catch { check(true,"新旧两份进程同时运行时拒绝报告成功") }
+            live = [process(501,"/Downloads/Old.app")]
+            do { try await processes.verifyLaunch(at:destination,pid:501,stopped:[]); check(false,"其他目录中的旧副本不能冒充已更新") }
+            catch { check(true,"启动返回其他目录的副本时拒绝报告成功") }
+            live = [installed]
+            do { try await processes.verifyLaunch(at:destination,pid:501,stopped:[501]); check(false,"旧 PID 不能冒充新进程") }
+            catch { check(true,"即使路径相同也不能复用已要求退出的旧 PID") }
+        }
+        do {
+            let f = try InstallerFixture()
+            let foreign = f.root.appendingPathComponent("Other.app")
+            try f.writeApp(at:foreign,marker:"foreign",id:"org.example.other")
+            var live = [InstallerProcess(pid:601,bundleID:nil,bundleURL:f.payload,executableURL:f.payload.appendingPathComponent("Contents/MacOS/TranslateType")),
+                        InstallerProcess(pid:602,bundleID:nil,bundleURL:foreign,executableURL:foreign.appendingPathComponent("Contents/MacOS/TranslateType"))]
+            let processes = InstallerProcesses(inventory:{live},requestStop:{ pid,_ in live.removeAll {$0.pid == pid} },delay:0)
+            let stopped = try await processes.stopAll()
+            check(stopped == [601] && live.map(\.pid) == [602],"系统缺少 bundle ID 时只按已验证的方寸应用元数据退出，不按同名程序误杀其他产品")
+        }
+        do {
+            let destination = URL(fileURLWithPath:"/Users/test/Library/Input Methods/FangCun.app")
+            var reads = 0
+            let processes = InstallerProcesses(inventory:{
+                reads += 1
+                if reads == 1 { return [] }
+                if reads == 2 { return [InstallerProcess(pid:701,bundleID:InputSourceStatus.bundleID,bundleURL:nil,executableURL:nil)] }
+                return [process(701,destination.path)]
+            },requestStop:{_,_ in},delay:0)
+            try await processes.verifyLaunch(at:destination,pid:701,stopped:[])
+            check(reads == 3,"等待新进程出现在系统清单并补齐路径后再确认启动成功")
+        }
         do {
             let f = try InstallerFixture(), s = FakeInstallerSystem()
             let result = try await service(f,s).install(payload:f.payload,installer:f.payload) {_ in}
@@ -96,6 +178,19 @@ final class InstallerFixture {
             _ = try await service(f,s).install(payload:f.payload,installer:f.payload) {_ in}
             check(try f.marker(f.destination) == "new" && f.backups.count == 1 && f.marker(f.backups[0]) == "old","升级保留可恢复的旧版快照")
             check(try String(contentsOf:userData) == "saved-key-and-draft","升级不修改用户配置与恢复稿")
+        }
+        for state in 0..<5 {
+            let f = try InstallerFixture(), s = FakeInstallerSystem()
+            if state == 0 { try f.writeApp(at:f.destination,marker:"old") }
+            if state == 1 { s.hadRunningProcesses = true }
+            if state == 2 { s.currentID = InputSourceStatus.modeID }
+            if state == 3 { s.currentID = InputSourceStatus.retiredEnglishModeID }
+            if state == 4 { s.currentID = InputSourceStatus.legacyBundleIDs[0] + ".Hans" }
+            let result = try await service(f,s).install(payload:f.payload,installer:f.payload) {_ in}
+            if case .needsLogin(let reason) = result {
+                check(reason.contains("输入会话"),"覆盖安装、发现旧进程或已有输入会话时明确要求重新登录：\(state)")
+            } else { check(false,"旧宿主会话存在时不能报告可开始使用") }
+            check(!s.events.contains("launch") && !s.events.contains("select"),"不强制启动新实例或切回方寸来冒充完成旧宿主会话迁移：\(state)")
         }
         do {
             let f = try InstallerFixture(), s = FakeInstallerSystem()
@@ -210,6 +305,17 @@ final class InstallerFixture {
             check(button.isEnabled && f.fm.fileExists(atPath:f.destination.path),"真实安装按钮完成复制并切换为开始使用")
             check(views.compactMap {$0 as? NSTextField}.contains {$0.stringValue.contains("方寸已添加到系统输入法")},"完成界面明确显示启用结果")
             check(delegate.windowShouldClose(window),"安装完成后可关闭窗口")
+            window.close(); withExtendedLifetime(delegate) {}
+        }
+        do {
+            let f = try InstallerFixture(), s = FakeInstallerSystem()
+            try f.writeApp(at:f.destination,marker:"old")
+            let (delegate,window,views) = ui(f,s)
+            let button = views.compactMap {$0 as? NSButton}.first {$0.title == "安装方寸输入法"}!
+            button.performClick(nil)
+            try await wait { button.title == "需要重新登录" }
+            check(!button.isEnabled && views.compactMap {$0 as? NSTextField}.contains {$0.stringValue.contains("输入会话") && $0.stringValue.contains("保存所有工作")},"覆盖升级的实际安装按钮显示保存工作和重新登录，不提供开始使用")
+            check(!s.events.contains("launch") && !s.events.contains("select"),"覆盖升级界面不拉起新实例或切回旧宿主会话")
             window.close(); withExtendedLifetime(delegate) {}
         }
         do {
