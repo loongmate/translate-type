@@ -156,10 +156,10 @@ final class InstallerService {
         throw InstallFailure(message:"旧版方寸尚未退出，应用未替换。请保存文字并退出方寸后重试。")
     }
     func launch(at url:URL) async throws {
-        let config = NSWorkspace.OpenConfiguration(); config.arguments = ["--settings"]
+        let config = NSWorkspace.OpenConfiguration()
         config.activates = true
         let _:NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
-            NSWorkspace.shared.openApplication(at:url,configuration:config) { app,error in
+            NSWorkspace.shared.open([URL(string:"fangcun://settings")!],withApplicationAt:url,configuration:config) { app,error in
                 if let app { continuation.resume(returning:app) }
                 else { continuation.resume(throwing:error ?? InstallFailure(message:"无法打开已安装的方寸输入法。")) }
             }

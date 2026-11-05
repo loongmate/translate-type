@@ -207,7 +207,7 @@ import Carbon
                 if translating { key("e",14,flags:[.control,.shift]) }
                 let before = client.text.string
                 var expectedSymbols = before
-                for text in ["test@example.com","foo_bar_v2","src/main.swift","C:\\path\\file","cmd|grep","func(a,b)","data[0]","obj{key}","tag<value>","name\"value","var$value","path~backup","hello,world!","query?x=1&y=2"] {
+                for text in ["test@example.com","foo_bar_v2","cmd|grep","obj{key}","var$value","path~backup"] {
                     type(text)
                     precondition(client.text.string == expectedSymbols+text && client.text.hasMarkedText(),"\(text)：真实输入框符号不自动选词或上屏")
                     key(" ",49)
@@ -216,20 +216,18 @@ import Carbon
                     check(expectedSymbols,"\(layout.name) / \(translating ? "译英" : "中文")：\(text) 原样确认")
                 }
                 let beforeProtocol = client.text.string
-                type("https"); key(":",41,flags:[.shift])
-                precondition(client.text.string == beforeProtocol+"https:" && client.text.hasMarkedText(),"真实 Shift+冒号保留 https: 在预编辑区，不自动上屏")
-                type("//code.aliyun.com:8443/a-b_v2?x=1+2&y=3#v4")
+                shift(true); shift(false)
                 let secureAddress = "https://code.aliyun.com:8443/a-b_v2?x=1+2&y=3#v4"
-                precondition(client.text.string == beforeProtocol+secureAddress && client.text.hasMarkedText(),"协议、双斜杠、端口、查询参数和片段均原样预编辑")
-                key(" ",49)
+                type(secureAddress)
                 if translating { key("\r",36) }
-                check(beforeProtocol+secureAddress,"\(layout.name) / \(translating ? "译英" : "中文")：https: 不提前上屏，完整 HTTPS 地址原样确认")
+                check(beforeProtocol+secureAddress,"\(layout.name) / \(translating ? "译英" : "中文")：英文模式完整输入 HTTPS 地址，标点保留半角")
+                shift(true); shift(false)
                 let beforeBare = client.text.string
-                let address = "code.aliyun.com/a-b_v2?x=1+2&y=3"
+                let address = "code_aliyun.com/a-b_v2?x=1+2&y=3"
                 type(address)
                 precondition(client.text.string == beforeBare+address && client.text.hasMarkedText(),"网址应该完整原样显示在真实预编辑区")
                 key("\u{f702}",123); key("\u{8}",51); key("=",24)
-                let corrected = "code.aliyun.com/a-b_v2?x=1+2&y=3"
+                let corrected = "code_aliyun.com/a-b_v2?x=1+2&y=3"
                 key("\u{f703}",124)
                 precondition(client.text.string == beforeBare+corrected && client.text.selectedRange().location == (beforeBare+corrected).utf16.count,"真实输入框的网址编辑光标准确")
                 key("\r",36,flags:[.control])
@@ -240,9 +238,27 @@ import Carbon
                     key("\r",36)
                 }
                 check(beforeBare+corrected,"\(layout.name) / \(translating ? "译英" : "中文")：实际控制器的网址、数字符号、光标编辑与 Enter 原样确认")
-                type(layout == .sogou ? "nihk" : "nihao"); key(" ",49); key(".",47)
+                type(layout == .sogou ? "nihk" : "nihao"); key(".",47)
                 if translating { key("\r",36) }
-                check(beforeBare+corrected+"你好。","\(layout.name)：网址后恢复中文，明确选词后的句号仍为 。")
+                check(beforeBare+corrected+"你好。","\(layout.name)：原文片段后恢复中文，拼音后直接按句号得到你好。")
+                let beforePunctuation = client.text.string
+                var expectedPunctuation = beforePunctuation
+                let punctuationKeys: [(String,UInt16,NSEvent.ModifierFlags,String)] = [
+                    (",",43,[],"，"),("?",44,[.shift],"？"),("!",18,[.shift],"！"),
+                    (":",41,[.shift],"："),("[",33,[],"【"),("]",30,[],"】"),
+                    ("<",43,[.shift],"《"),(">",47,[.shift],"》"),
+                    ("\"",39,[.shift],"“"),("\"",39,[.shift],"”")
+                ]
+                for (symbol,code,flags,mark) in punctuationKeys {
+                    type(layout == .sogou ? "nihk" : "nihao")
+                    precondition(key(symbol,code,flags:flags),"中文标点事件应由输入法处理")
+                    expectedPunctuation += "你好"+mark
+                    if translating {
+                        precondition(client.text.hasMarkedText(),"译英模式标点只确认到草稿")
+                        key("\r",36)
+                    }
+                    check(expectedPunctuation,"\(layout.name)：真实按键拼音接 \(symbol) 输出中文和 \(mark)")
+                }
                 if translating { key("e",14,flags:[.control,.shift]) }
             }
         }

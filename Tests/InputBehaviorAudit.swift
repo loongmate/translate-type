@@ -92,8 +92,9 @@ import Foundation
             let sentence = punctuation.session.candidates[0]; punctuation.key(32); punctuation.type(".")
             record("PUNCT-"+suffix,"句号跟随已选中文","nihao → Space → .",sentence+"。",punctuation,(translation ? punctuation.session.draft : punctuation.output) == sentence+"。")
             let explicitWord = try Driver(translation:translation); explicitWord.type("hao"); explicitWord.key(0xff54)
+            let punctuationWord = explicitWord.session.snapshot.preview
             explicitWord.type(",")
-            record("PUNCT-SELECT-"+suffix,"候选仅高亮时标点不替用户选词","hao → ↓ → ,","保留 hao, 在预编辑区，不确认中文",explicitWord,explicitWord.session.snapshot.input == "hao," && explicitWord.output.isEmpty && explicitWord.session.draft.isEmpty)
+            record("PUNCT-SELECT-"+suffix,"标点确认当前高亮候选并输出中文逗号","hao → ↓ → ,",punctuationWord+"，",explicitWord,!explicitWord.session.hasPendingInput && (translation ? explicitWord.session.draft : explicitWord.output) == punctuationWord+"，")
             let raw = try Driver(translation:translation); raw.type("logo"); raw.key(0xff0d)
             record("RAW-"+suffix,"未选择的英文原样确认","logo → Enter","logo",raw,(translation ? raw.session.draft : raw.output) == "logo")
             let partialRaw = try Driver(translation:translation); partialRaw.type("nihao"); partialRaw.left(3); partialRaw.key(32); partialRaw.key(0xff0d)

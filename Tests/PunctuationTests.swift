@@ -2,10 +2,11 @@ import Foundation
 
 @main struct PunctuationTests {
     // Enumerate the entire printable ASCII symbol set independently of the
-    // production classifier. Every key must either retain its documented IME
-    // role or preserve the entire pending fragment without an implicit commit.
+    // production classifier: Chinese punctuation confirms the displayed text;
+    // spelling, paging and literal fragments retain their own input rules.
     static let symbols = Array("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".unicodeScalars)
     static let shifted = Set("~!@#$%^&*()_+{}|:\"<>?".unicodeScalars)
+    static let chinesePunctuation: [UInt32:String] = [47:"、",92:"、",44:"，",46:"。",58:"：",59:"；",63:"？",33:"！",40:"（",41:"）",91:"【",93:"】",60:"《",62:"》",34:"“"]
     static var checks = 0
     static let fixtures: [(PinyinLayout,String,String,Bool)] = [
         (.fullPinyin,"nihao","beijing",false),(.sogou,"nihk","bzj;",true),
@@ -40,14 +41,19 @@ import Foundation
                         let before = s.snapshot, key = Int(scalar.value)
                         let label = "\(layout.name)/\(mode)/\(prefix)/\(scalar)"
                         check(s.handle(key:key,shift:shifted.contains(scalar)),label+"：消费普通按键")
-                        check(output.isEmpty && s.draft.isEmpty && s.hasPendingInput,label+"：不自动上屏或确认到草稿")
                         let paging = [43,45,61].contains(key)
                         let spelling = key == 39 || (key == 59 && semicolonSpelling)
                         if paging {
                             check(!engine.isLiteralInput && s.snapshot.input == before.input && s.snapshot.selectionStart == 0 && s.snapshot.caret == s.snapshot.preedit.utf16.count,label+"：保留符号翻页，不改变原始输入或进入拼音编辑")
                         } else if spelling {
                             check(!engine.isLiteralInput && s.snapshot.input == prefix+String(scalar),label+"：隔音或双拼编码仍属于拼音")
+                        } else if let punctuation = chinesePunctuation[scalar.value] {
+                            let result = mode == 0 ? output : s.draft
+                            let endings = key == 34 ? ["“","”"] : [punctuation]
+                            check(endings.contains(where:{ result == before.preview+$0 }) && !s.hasPendingInput && !engine.isLiteralInput,label+"：确认当前候选并输入中文标点，不退回原始字母")
+                            check(!s.isTranslating && (mode == 0 || output.isEmpty),label+"：标点不调用模型，译英与编辑区只更新草稿")
                         } else {
+                            check(output.isEmpty && s.draft.isEmpty && s.hasPendingInput,label+"：普通符号保留待确认片段")
                             let start = prefix+String(scalar)
                             check(engine.isLiteralInput && s.snapshot.input == start && s.snapshot.preedit == start && s.candidates == [start] && !s.asciiMode,label+"：整段原样预编辑")
                             // After any ordinary symbol, all symbols (including
@@ -74,7 +80,6 @@ import Foundation
                 }
             }
             // Explicit Chinese confirmation still permits normal punctuation.
-            let chinesePunctuation: [UInt32:String] = [47:"、",92:"、",44:"，",46:"。",58:"：",59:"；",63:"？",33:"！",40:"（",41:"）"]
             for mode in 0..<3 {
                 for scalar in symbols {
                     engine.clear()
@@ -86,8 +91,26 @@ import Foundation
                     check(s.candidates.contains("你好"),"\(layout.name)：拼音方案仍可输入你好")
                     s.choose(s.candidates.firstIndex(of:"你好")!)
                     if !s.handle(key:Int(scalar.value),shift:shifted.contains(scalar)) { output += String(scalar) }
-                    let expected = "你好"+(chinesePunctuation[scalar.value] ?? String(scalar))
-                    check(!s.hasPendingInput && !engine.isLiteralInput && (mode == 0 ? output == expected : s.draft == expected && output.isEmpty),"\(layout.name)/\(mode)/\(scalar)：已选中文后正常输入标点")
+                    let endings = scalar.value == 34 ? ["“","”"] : [chinesePunctuation[scalar.value] ?? String(scalar)]
+                    let result = mode == 0 ? output : s.draft
+                    check(!s.hasPendingInput && !engine.isLiteralInput && endings.contains(where:{ result == "你好"+$0 }) && (mode == 0 || output.isEmpty),"\(layout.name)/\(mode)/\(scalar)：已选中文后正常输入标点")
+                }
+                for navigation in [0xff54,0xff56] {
+                    engine.clear()
+                    let s = CompositionSession(engine:engine,translateEnabled:mode == 1)
+                    var output = ""
+                    s.onInsert = { output += $0 }
+                    if mode == 2 { s.beginEditor() }
+                    type("ni",in:s)
+                    s.handle(key:navigation)
+                    let selected = s.snapshot.preview
+                    s.handle(key:44)
+                    check((mode == 0 ? output : s.draft) == selected+"，" && !s.hasPendingInput,"\(layout.name)/\(mode)：标点确认移动高亮或翻页后的候选")
+                    s.setASCIIMode(true)
+                    let before = mode == 0 ? output : s.draft
+                    let text = String(String.UnicodeScalarView(symbols))
+                    type(text,in:s)
+                    check((mode == 0 ? output : s.draft) == before+text && !s.hasPendingInput,"\(layout.name)/\(mode)：英文模式全部 32 种符号保持半角")
                 }
             }
             engine.clear()
@@ -104,8 +127,14 @@ import Foundation
             let partial = CompositionSession(engine:engine,translateEnabled:true)
             type("nihao",in:partial)
             partial.choose(partial.candidates.firstIndex(of:"你")!)
+            let preview = partial.snapshot.preview
             partial.handle(key:Int(scalar.value),shift:shifted.contains(scalar))
-            check(partial.snapshot.input == "你hao"+String(scalar) && partial.draft.isEmpty,"\(scalar)：保留已选中文前缀，不确认未选尾部")
+            if let punctuation = chinesePunctuation[scalar.value] {
+                let endings = scalar.value == 34 ? ["“","”"] : [punctuation]
+                check(endings.contains(where:{ partial.draft == preview+$0 }) && !partial.hasPendingInput,"\(scalar)：分段选词后保留中文前缀并确认剩余候选")
+            } else {
+                check(partial.snapshot.input == "你hao"+String(scalar) && partial.draft.isEmpty,"\(scalar)：普通符号保留已选中文前缀和原始尾部")
+            }
         }
         print("ALL PUNCTUATION TESTS PASSED: \(cases) pending-input cases, \(checks) assertions")
     }

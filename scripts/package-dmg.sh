@@ -20,7 +20,15 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIS
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
 mkdir -p dist .build
 STAGING="$(mktemp -d "$PWD/.build/package-dmg.XXXXXX")"
-trap 'rm -rf "$STAGING"' EXIT
+cleanup() {
+    local PACKAGE_STATUS=$?
+    if [ "$PACKAGE_STATUS" = 0 ]; then
+        rm -rf "$STAGING"
+    else
+        echo "打包失败，已保留签名、公证及映像中间文件：$STAGING" >&2
+    fi
+}
+trap cleanup EXIT
 mkdir -p "$STAGING/images"
 notarize() {
     local FILE="$1" LOG="$2"
@@ -87,7 +95,7 @@ for CHIP in AppleSilicon Intel; do
     fi
     cat docs/distribution-installer.txt >> "$PACKAGE/INSTALL.txt"
     # Input methods belong in Library/Input Methods, so there is no Applications alias.
-    hdiutil create -volname "FangCun $VERSION $CHIP" -srcfolder "$PACKAGE" \
+    hdiutil create -volname "FangCun $VERSION build$BUILD $CHIP" -srcfolder "$PACKAGE" \
         -format UDZO -fs HFS+ "$STAGING/images/$NAME.dmg"
     if [ "$SIGN_ID" != - ]; then
         codesign --force --timestamp --sign "$SIGN_ID" "$STAGING/images/$NAME.dmg"

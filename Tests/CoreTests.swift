@@ -33,19 +33,18 @@ struct CoreTests {
                 func result() -> String { translating ? punctuation.draft : output }
                 check(punctuation.handle(key:47) && result() == "、" && !punctuation.hasPendingInput,"\(label)：空输入按 / 直接确认顿号")
                 for c in "ni".unicodeScalars { punctuation.handle(key:Int(c.value)) }
-                check(punctuation.handle(key:47) && result() == "、" && punctuation.snapshot.input == "ni/","\(label)：未选字母后 / 保留原码和半角斜杠，不确认中文候选")
-                punctuation.handle(key:32)
-                check(result() == "、ni/" && !punctuation.hasPendingInput,"\(label)：空格明确确认含斜杠的原始片段")
+                let selected = punctuation.snapshot.preview
+                check(punctuation.handle(key:47) && result() == "、"+selected+"、" && !punctuation.hasPendingInput,"\(label)：未选拼音后 / 确认当前中文候选和顿号")
                 let before = result()
                 check(!punctuation.handle(key:47,command:true) && result() == before,"\(label)：Command+/ 仍交给应用")
                 check(punctuation.handle(key:63,shift:true) && result() == before+"？","\(label)：Shift+/ 仍为中文问号")
                 let beforeBackslash = result()
                 check(punctuation.handle(key:92) && result() == beforeBackslash+"、" && !punctuation.hasPendingInput,"\(label)：空输入按反斜杠直接确认顿号")
                 let beforeLiteral = result()
-                for c in "ni\\path".unicodeScalars { punctuation.handle(key:Int(c.value)) }
-                check(punctuation.snapshot.input == "ni\\path" && result() == beforeLiteral,"\(label)：未选字母后的反斜杠保留原码，不确认中文候选")
-                punctuation.handle(key:32)
-                check(result() == beforeLiteral+"ni\\path" && !punctuation.hasPendingInput,"\(label)：空格完整确认含反斜杠的原始片段")
+                for c in "ni".unicodeScalars { punctuation.handle(key:Int(c.value)) }
+                let selectedBackslash = punctuation.snapshot.preview
+                punctuation.handle(key:92)
+                check(result() == beforeLiteral+selectedBackslash+"、" && !punctuation.hasPendingInput,"\(label)：未选拼音后反斜杠确认中文和顿号")
                 check(!punctuation.handle(key:92,command:true),"\(label)：Command+反斜杠仍交给应用")
                 let beforePipe = result()
                 if !punctuation.handle(key:124,shift:true) { output += "|" }
@@ -68,7 +67,7 @@ struct CoreTests {
                 let label = "\(layout.name) / \(translating ? "译英草稿" : "中文上屏")"
                 func type(_ text:String) { for c in text.unicodeScalars { literal.handle(key:Int(c.value)) } }
                 func result() -> String { translating ? literal.draft : output }
-                let samples = ["code.aliyun.com","repo.aliyun.com/a-b_v2?x=1+2&y=3#v4","AliYun.com:8080/path,ok;yes!()","https:","https://code.aliyun.com:8443/a-b_v2?x=1+2&y=3#v4","http://localhost:3000/a?x=1","SSH://Host:22"]
+                let samples = ["test@example.com","repo_name/a-b_v2?x=1+2&y=3#v4","AliYun_host:8080/path,ok;yes!()","foo_bar","foo_v2:https://code.aliyun.com:8443/a-b_v2?x=1+2&y=3#v4"]
                 var expected = ""
                 for (i,text) in samples.enumerated() {
                     for c in text.unicodeScalars { literal.handle(key:Int(c.value),shift:c == ":") }
@@ -89,29 +88,30 @@ struct CoreTests {
                 check(result() == expected && !literal.hasPendingInput,"\(label)：明确选好中文后点号仍直接输入中文句号")
                 literal.handle(key:58,shift:true); expected += "："
                 check(result() == expected && !literal.hasPendingInput,"\(label)：明确选好中文后冒号仍直接输入中文冒号")
-                type("nihao:")
-                check(literal.snapshot.input == "nihao:" && result() == expected,"\(label)：冒号不猜测协议名称或拼音，nihao: 也保留原码")
-                literal.discardPendingInput()
-                type("nihao.")
-                check(literal.snapshot.input == "nihao." && result() == expected,"\(label)：点号不猜测英文或拼音，nihao. 也保留原码")
-                literal.discardPendingInput()
-                type("code.aliyun.cmo")
+                for (key,mark) in [(58,"："),(46,"。")] {
+                    type(helloCodes[layout]!)
+                    let preview = literal.snapshot.preview
+                    literal.handle(key:key,shift:key == 58)
+                    expected += preview+mark
+                    check(result() == expected && !literal.hasPendingInput,"\(label)：拼音后直接按标点确认中文，不退回字母")
+                }
+                type("code_aliyun.cmo")
                 for _ in 0..<2 { literal.handle(key:0xff51) }
                 literal.handle(key:0xffff); literal.handle(key:0xff53); type("m")
-                check(literal.snapshot.input == "code.aliyun.com" && literal.snapshot.caret == 15,"\(label)：网址中左右移动、前向删除和插入作用于真实光标")
+                check(literal.snapshot.input == "code_aliyun.com" && literal.snapshot.caret == "code_aliyun.com".utf16.count,"\(label)：网址中左右移动、前向删除和插入作用于真实光标")
                 literal.handle(key:0xff57); literal.handle(key:0xff08)
-                check(literal.snapshot.input == "code.aliyun.co","\(label)：End 后退格删除一个原始字符，不撤销选词")
+                check(literal.snapshot.input == "code_aliyun.co","\(label)：End 后退格删除一个原始字符，不撤销选词")
                 literal.handle(key:0xff50); literal.handle(key:0xff08)
-                check(literal.snapshot.input == "code.aliyun.co" && literal.snapshot.caret == 0,"\(label)：Home 和开头退格不损坏原始片段")
+                check(literal.snapshot.input == "code_aliyun.co" && literal.snapshot.caret == 0,"\(label)：Home 和开头退格不损坏原始片段")
                 literal.discardPendingInput()
-                type("code.")
+                type("code_")
                 for _ in 0..<5 { literal.handle(key:0xff08) }
                 check(!literal.hasPendingInput && !literal.engine.isLiteralInput,"\(label)：删除完整片段后恢复普通中文输入")
-                type("code."); literal.setASCIIMode(true); type("aliyun.com"); literal.setASCIIMode(false)
-                expected += "code.aliyun.com"
+                type("code_"); literal.setASCIIMode(true); type("aliyun.com"); literal.setASCIIMode(false)
+                expected += "code_aliyun.com"
                 check(result() == expected && !literal.hasPendingInput,"\(label)：片段中切英文保留已有原码，切回后不残留直输状态")
-                type("code.aliyun.com")
-                literal.flushOriginal(); expected += "code.aliyun.com"
+                type("code_aliyun.com")
+                literal.flushOriginal(); expected += "code_aliyun.com"
                 check(output == expected && !literal.hasPendingInput && !literal.engine.isLiteralInput,"\(label)：失焦提交完整原始片段并清理状态")
             }
         }
@@ -122,28 +122,27 @@ struct CoreTests {
             for c in "nihao".unicodeScalars { partial.handle(key:Int(c.value)) }
             partial.choose(partial.candidates.firstIndex(of:"你")!)
             partial.handle(key:46)
-            check(partial.snapshot.input == "你hao." && partial.markedText == "你hao.","点号保留 Rime 中已经选好的中文前缀，只将未选尾部转为原码")
-            partial.handle(key:32)
-            check((translating ? partial.draft : output) == "你hao.","原样确认片段不把已选中文前缀还原为拼音")
+            check(!partial.hasPendingInput && (translating ? partial.draft : output) == "你好。","点号保留已选中文前缀并确认剩余中文候选")
             let middle = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
             for c in "nvhai".unicodeScalars { middle.handle(key:Int(c.value)) }
             for _ in 0..<3 { middle.handle(key:0xff51) }
-            middle.handle(key:46)
-            check(middle.snapshot.input == "nv.hai" && middle.snapshot.caret == 3,"拼音光标中途按点保留后方输入，并按原始字母定位（含 ü 格式化）")
+            middle.handle(key:64)
+            check(middle.snapshot.input == "nv@hai" && middle.snapshot.caret == 3,"拼音光标中途按普通符号保留后方输入，并按原始字母定位（含 ü 格式化）")
             let colon = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
+            var colonOutput = ""; colon.onInsert = { colonOutput += $0 }
             for c in "nihao".unicodeScalars { colon.handle(key:Int(c.value)) }
             colon.choose(colon.candidates.firstIndex(of:"你")!)
             colon.handle(key:58,shift:true)
-            check(colon.snapshot.input == "你hao:" && colon.markedText == "你hao:","冒号保留已选中文前缀，不确认未选尾部")
+            check(!colon.hasPendingInput && (translating ? colon.draft : colonOutput) == "你好：","冒号保留已选中文前缀并确认剩余中文候选")
             let tab = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
             var tabOutput = ""
             tab.onInsert = { tabOutput += $0 }
-            for c in "code.aliyun.com".unicodeScalars { tab.handle(key:Int(c.value)) }
-            check(!tab.handle(key:0xff09) && tabOutput == "code.aliyun.com" && !tab.hasPendingInput,"网址中 Tab 完整提交原文后交给宿主切换焦点")
+            for c in "code_aliyun.com".unicodeScalars { tab.handle(key:Int(c.value)) }
+            check(!tab.handle(key:0xff09) && tabOutput == "code_aliyun.com" && !tab.hasPendingInput,"网址中 Tab 完整提交原文后交给宿主切换焦点")
             let deferred = CompositionSession(engine:try PinyinEngine(),translateEnabled:translating)
-            for c in "code.aliyun.com".unicodeScalars { deferred.handle(key:Int(c.value)) }
+            for c in "code_aliyun.com".unicodeScalars { deferred.handle(key:Int(c.value)) }
             try deferred.requestPinyinLayout(.sogou)
-            check(deferred.pinyinLayout == .fullPinyin && deferred.pendingPinyinLayout == .sogou && deferred.snapshot.input == "code.aliyun.com","网址未确认时切换拼音方案不重解释片段")
+            check(deferred.pinyinLayout == .fullPinyin && deferred.pendingPinyinLayout == .sogou && deferred.snapshot.input == "code_aliyun.com","网址未确认时切换拼音方案不重解释片段")
             deferred.handle(key:32)
             check(deferred.pinyinLayout == .sogou && !deferred.hasPendingInput,"确认网址后应用待切换的拼音方案")
         }

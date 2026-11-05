@@ -4,7 +4,7 @@
 schema:
   schema_id: fangcun_microsoft
   name: 方寸微软双拼
-  version: "1.3"
+  version: "1.4"
 switches:
   - name: ascii_mode
     reset: 0
@@ -79,6 +79,11 @@ punctuator:
     ';': '；'
     '(': '（'
     ')': '）'
+    '[': '【'
+    ']': '】'
+    '<': '《'
+    '>': '》'
+    '"': {pair: ['“', '”']}
 emoji_conversion:
   opencc_config: emoji.json
   option_name: emoji_suggestion

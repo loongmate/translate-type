@@ -50,9 +50,9 @@ final class PinyinEngine {
     func process(_ key: Int, modifiers: Int = 0) -> (Bool, PinyinSnapshot) {
         if isLiteralInput { return processLiteral(key) }
         if startsLiteralFragment(key), !lastState.input.isEmpty {
-            // Ordinary ASCII symbols never confirm a pinyin candidate. Keep confirmed Chinese
-            // segments, but retain every unconfirmed letter (including text
-            // after a moved caret) and edit the whole fragment literally.
+            // Symbols without a Chinese punctuation mapping start a literal
+            // fragment. Chinese punctuation must reach Rime so it confirms the
+            // selected candidate instead of turning the pinyin back into Latin.
             let rawLength = lastState.input.utf16.count
             let rawCaret = Int(TTMoveCaretToEnd(id))
             _ = TTProcessKey(id, 0xff0d, 0)
@@ -98,8 +98,12 @@ final class PinyinEngine {
         // has begun, processLiteral accepts them as ordinary text instead.
         guard symbol, ![39,43,45,61].contains(key) else { return false }
         if key == 59 && [.sogou,.microsoft,.ziguang].contains(layout) { return false }
+        if Self.chinesePunctuationKeys.contains(key) { return false }
         return true
     }
+    // Keep in sync with punctuator.half_shape in the generated Rime schemas.
+    // Apostrophe remains a syllable separator while composing pinyin.
+    private static let chinesePunctuationKeys = Set("!\"(),./:;<>?[\\]".unicodeScalars.map { Int($0.value) })
     func select(_ index: Int) -> PinyinSnapshot {
         if isLiteralInput { return index == 0 ? commit() : snapshot() }
         let native = mapping.indices.contains(index) ? mapping[index] : index

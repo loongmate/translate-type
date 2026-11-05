@@ -161,8 +161,8 @@ import InputMethodKit
         key("",53)
         check(!s.hasPendingInput && s.draft.contains("🧭") && editor.isVisible,"Esc 优先取消拼音，保留原选区与编辑窗")
         s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
-        type("code.aliyun.com/a-b?x=1+2")
-        let address = "code.aliyun.com/a-b?x=1+2"
+        type("code_aliyun.com/a-b?x=1+2")
+        let address = "code_aliyun.com/a-b?x=1+2"
         check(editor.source.string == "头"+address+"尾" && s.snapshot.input == address && s.engine.isLiteralInput,"编辑区网址保持原始字母和符号，插入在真实草稿光标位置")
         key("\r",36,[.control])
         check(s.hasPendingInput && !s.isTranslating && s.markedText == "头"+address+"尾","编辑区未确认网址不执行动作，不丢前后文字")
@@ -170,22 +170,26 @@ import InputMethodKit
         check(s.draft == "头"+address+"尾" && !s.hasPendingInput && !s.engine.isLiteralInput,"编辑区空格确认完整原文，恢复中文输入")
         key("\r",36)
         check(s.draft == "头"+address+"\n尾","网址确认后的 Enter 仍在真实光标处换行")
-        type("code.aliyun.com"); key("\t",48)
-        check(!s.hasPendingInput && s.draft == "头"+address+"\ncode.aliyun.com\t尾","编辑区 Tab 确认网址并在当前位置插入制表符")
+        type("code_aliyun.com"); key("\t",48)
+        check(!s.hasPendingInput && s.draft == "头"+address+"\ncode_aliyun.com\t尾","编辑区 Tab 确认网址并在当前位置插入制表符")
         s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
-        type("https"); key(":",41,[.shift])
-        check(s.snapshot.input == "https:" && s.draft == "头尾" && editor.source.string == "头https:尾","编辑区 Shift+冒号保留协议前缀，不自动确认到草稿")
-        type("//code.aliyun.com:8443/a?x=1+2")
+        s.setASCIIMode(true)
         let secureAddress = "https://code.aliyun.com:8443/a?x=1+2"
-        key("\r",36)
-        check(!s.hasPendingInput && s.draft == "头"+secureAddress+"尾","编辑区 Enter 完整确认含协议、端口与查询参数的网址")
-        for text in ["test@example.com","foo_bar_v2","src/main.swift","C:\\path\\file","cmd|grep","func(a,b)","data[0]","obj{key}","tag<value>","var$value","path~backup","hello,world!"] {
+        type(secureAddress)
+        check(!s.hasPendingInput && s.draft == "头"+secureAddress+"尾","编辑区英文模式保留网址半角标点，并在光标处插入")
+        s.setASCIIMode(false)
+        for text in ["test@example.com","foo_bar_v2","cmd|grep","obj{key}","var$value","path~backup"] {
             s.replaceEditorText("头尾",selection:NSRange(location:1,length:0))
             type(text)
             check(s.snapshot.input == text && s.draft == "头尾" && editor.source.string == "头"+text+"尾","编辑区 \(text)：符号不提前确认，不丢前后文字")
             key(" ",49)
             check(!s.hasPendingInput && s.draft == "头"+text+"尾","编辑区 \(text)：空格完整确认原文")
         }
+        s.replaceEditorText("头旧尾",selection:NSRange(location:1,length:1))
+        type("nihao"); key(",",43)
+        check(!s.hasPendingInput && s.draft == "头你好，尾" && editor.source.string == "头你好，尾","编辑区拼音后按逗号确认中文，替换原选区且保留前后文字")
+        type("shijie"); key("!",18,[.shift])
+        check(!s.hasPendingInput && s.draft == "头你好，世界！尾","编辑区中文标点后继续拼音，不残留原文字母状态")
         s.replaceEditorText("待译内容",selection:NSRange(location:4,length:0))
         var requests = 0
         s.configuration = { ModelConfiguration(endpoint:"http://127.0.0.1:18887/v1",model:"editor-test") }

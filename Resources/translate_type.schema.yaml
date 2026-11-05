@@ -1,7 +1,7 @@
 schema:
   schema_id: translate_type
   name: 方寸全拼
-  version: '0.4.5'
+  version: '0.4.6'
 switches:
   - name: ascii_mode
     reset: 0
@@ -56,6 +56,11 @@ punctuator:
     ';': '；'
     '(': '（'
     ')': '）'
+    '[': '【'
+    ']': '】'
+    '<': '《'
+    '>': '》'
+    '"': {pair: ['“', '”']}
 emoji_conversion:
   opencc_config: emoji.json
   option_name: emoji_suggestion

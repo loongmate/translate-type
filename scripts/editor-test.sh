@@ -16,8 +16,8 @@ if not marker.exists() or marker.read_text() != h.hexdigest():
 marker.write_text(h.hexdigest())
 PY_CACHE
 TEST_SUITE="${FANGCUN_EDITOR_TEST:-EditorTests}"
-case "$TEST_SUITE" in EditorTests|AIActionTests|CandidateActionTests|ContextCandidateTests|CredentialSettingsTests|StatusAIEntryTests|AgentTests|ScratchpadTests) ;; *) exit 2 ;; esac
-if [ "$TEST_SUITE" != CredentialSettingsTests ] && [ "$TEST_SUITE" != StatusAIEntryTests ] && [ "$TEST_SUITE" != ScratchpadTests ]; then
+case "$TEST_SUITE" in AppLifecycleTests|EditorTests|AIActionTests|CandidateActionTests|ContextCandidateTests|CredentialSettingsTests|StatusAIEntryTests|AgentTests|ScratchpadTests) ;; *) exit 2 ;; esac
+if [ "$TEST_SUITE" != AppLifecycleTests ] && [ "$TEST_SUITE" != CredentialSettingsTests ] && [ "$TEST_SUITE" != StatusAIEntryTests ] && [ "$TEST_SUITE" != ScratchpadTests ]; then
     python3 Tests/mock_server.py > .build/editor-mock.log 2>&1 &
     MOCK_PID=$!
     trap 'kill "$MOCK_PID" 2>/dev/null || true' EXIT

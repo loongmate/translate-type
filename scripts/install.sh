@@ -38,7 +38,7 @@ if ! ./scripts/input-sources.sh enable "$DESTINATION" "$PREVIOUS_SOURCE"; then
         ./scripts/input-sources.sh select "$RESTORE_SOURCE" || true
         echo '启用验证未通过，已恢复原安装。' >&2
     else
-        open -a "$DESTINATION" --args --settings
+        open -a "$DESTINATION" "fangcun://settings"
         echo '应用已安装，尚未通过系统启用验证。' >&2
     fi
     exit 1
@@ -52,7 +52,7 @@ for PREVIOUS in "$HOME/Library/Input Methods/方寸输入法.app" "$HOME/Library
     fi
 done
 if [ "${FANGCUN_OPEN_SETTINGS:-1}" = 1 ]; then
-    open -a "$DESTINATION" --args --settings
+    open -a "$DESTINATION" "fangcun://settings"
 else
     open -a "$DESTINATION"
 fi
