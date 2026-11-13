@@ -35,7 +35,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>45</string>
+	<string>46</string>
 	<key>InputMethodConnectionName</key>
 	<string>com.translatetype.inputmethod.TranslateType_Connection</string>
 	<key>InputMethodServerControllerClass</key>

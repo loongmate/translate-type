@@ -4,12 +4,12 @@ import Darwin
 
 @MainActor protocol InstallerSystem {
     var currentID:String { get }
-    func prepareUpdate(previousID:String) throws
+    func prepareUpdate(previousID:String) async throws
     func stop(at url:URL?) async throws -> Bool
     func register(at url:URL,payload:URL) async throws
     func enable(at url:URL) throws
-    func launch(at url:URL) async throws
-    func restore(at url:URL?,previousID:String) async throws
+    func launch(at url:URL,showSettings:Bool) async throws
+    func restore(at url:URL?,previousID:String,relaunch:Bool) async throws
     func select() throws
 }
 
@@ -62,9 +62,9 @@ final class InstallerService {
             return transaction
         }.value
         progress("正在更新应用，请稍候…")
-        try system.prepareUpdate(previousID:previousID)
         var filesReplaced = false
         do {
+            try await system.prepareUpdate(previousID:previousID)
             let stoppedOldProcess = try await system.stop(at:transaction.previous)
             try await Task.detached { try transaction.replace() }.value
             filesReplaced = true
@@ -85,19 +85,16 @@ final class InstallerService {
                 if transaction.previous != nil { throw pending }
                 return .needsLogin(pending.localizedDescription)
             }
-            // Killing/relaunching an IME does not reconnect the input contexts
-            // held by applications that were already running. Do not claim a
-            // live upgrade is ready just because TIS can select the new files.
-            if transaction.previous != nil || stoppedOldProcess || InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) {
-                return .needsLogin("覆盖升级需要重新建立各应用的输入会话，才能使用新版方寸。")
-            }
-            try await system.launch(at:transaction.destination)
+            progress("正在启动新版并恢复输入源…")
+            let firstInstall = transaction.previous == nil && !stoppedOldProcess && !InputSourceStatus.isOurMode(previousID) && !InputSourceStatus.isLegacy(previousID)
+            try await system.launch(at:transaction.destination,showSettings:firstInstall)
+            if InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) { try system.select() }
             return .ready
         } catch {
             do {
                 if filesReplaced { _ = try await system.stop(at:transaction.destination) }
                 try await Task.detached { try transaction.rollback() }.value
-                try await system.restore(at:transaction.previous,previousID:previousID)
+                try await system.restore(at:transaction.previous,previousID:previousID,relaunch:filesReplaced)
             } catch { throw InstallFailure(message:"安装未完成，自动恢复也遇到问题：\(error.localizedDescription)") }
             throw InstallFailure(message:"安装未完成\(transaction.previous == nil ? "" : "，已恢复原应用")：\(error.localizedDescription)")
         }
@@ -111,10 +108,21 @@ final class InstallerService {
     private var stoppedPIDs:Set<pid_t> = []
     init(processes:InstallerProcesses? = nil) { self.processes = processes ?? InstallerProcesses() }
     var currentID:String { InputSourceStatus.currentID }
-    func prepareUpdate(previousID:String) throws {
+    func prepareUpdate(previousID:String) async throws {
         if InputSourceStatus.isOurMode(previousID) || InputSourceStatus.isLegacy(previousID) {
             let fallback = TISCopyCurrentASCIICapableKeyboardLayoutInputSource().takeRetainedValue()
             guard TISSelectInputSource(fallback) == noErr else { throw InstallFailure(message:"暂时无法切换到备用键盘，旧应用未改动。请先切换到 ABC 再试。") }
+            let fallbackID = InputSourceStatus.identifier(fallback)
+            for _ in 0..<20 {
+                if InputSourceStatus.currentID == fallbackID {
+                    // Let client deactivation/commit notifications run before
+                    // requesting normal termination of the old input method.
+                    try await Task.sleep(nanoseconds:200_000_000)
+                    return
+                }
+                try await Task.sleep(nanoseconds:50_000_000)
+            }
+            throw InstallFailure(message:"未能确认备用键盘已选中，旧应用未改动，请重试。")
         }
     }
     func register(at url:URL,payload:URL) async throws {
@@ -128,13 +136,13 @@ final class InstallerService {
         // FangCun again while old host applications still hold IMK contexts.
         try InputSourceStatus.enable(at:url)
     }
-    func restore(at url:URL?,previousID:String) async throws {
-        if let url {
+    func restore(at url:URL?,previousID:String,relaunch:Bool) async throws {
+        if relaunch, let url {
             let registrar = lsregister
             _ = try await Task.detached { try InstallerService.command(registrar,["-f",url.path]) }.value
             try InputSourceStatus.enable(at:url)
-            try await launch(at:url)
-        } else {
+            try await launchProcess(at:url,showSettings:false,requireRuntime:false)
+        } else if relaunch {
             // A failed fresh install must not leave a selectable missing app.
             for id in [InputSourceStatus.modeID,InputSourceStatus.bundleID] {
                 if let source = InputSourceStatus.sources().first(where:{InputSourceStatus.identifier($0) == id}) {
@@ -154,25 +162,37 @@ final class InstallerService {
         stoppedPIDs.formUnion(stopped)
         return !stopped.isEmpty
     }
-    func launch(at url:URL) async throws {
+    func launch(at url:URL,showSettings:Bool) async throws {
+        try await launchProcess(at:url,showSettings:showSettings,requireRuntime:true)
+    }
+    private func launchProcess(at url:URL,showSettings:Bool,requireRuntime:Bool) async throws {
         let running = processes.inputMethods()
         if running.count > 1 || running.contains(where:{ !$0.matchesInstallation(url) || stoppedPIDs.contains($0.pid) }) {
             stoppedPIDs.formUnion(try await processes.stopAll())
         }
         let config = NSWorkspace.OpenConfiguration()
-        config.activates = true
+        config.activates = showSettings
         let launched:NSRunningApplication = try await withCheckedThrowingContinuation { continuation in
-            NSWorkspace.shared.open([URL(string:"fangcun://settings")!],withApplicationAt:url,configuration:config) { app,error in
+            let completion:@Sendable (NSRunningApplication?,Error?)->Void = { app,error in
                 if let app { continuation.resume(returning:app) }
                 else { continuation.resume(throwing:error ?? InstallFailure(message:"无法打开已安装的方寸输入法。")) }
             }
+            if showSettings {
+                NSWorkspace.shared.open([URL(string:"fangcun://settings")!],withApplicationAt:url,configuration:config,completionHandler:completion)
+            } else {
+                NSWorkspace.shared.openApplication(at:url,configuration:config,completionHandler:completion)
+            }
         }
         try await processes.verifyLaunch(at:url,pid:launched.processIdentifier,stopped:stoppedPIDs)
+        // A restored older build predates the readiness exchange. It must
+        // still be launchable when recovering from a failed upgrade.
+        if requireRuntime { try await InstallationRuntime.verify(at:url,pid:launched.processIdentifier) }
     }
     func select() throws {
         guard let source = InputSourceStatus.sources(includeDisabled:false).first(where:{ InputSourceStatus.identifier($0) == InputSourceStatus.modeID }),
-              TISSelectInputSource(source) == noErr else {
-            throw InstallFailure(message:"方寸已安装，请在系统输入菜单选择「方寸输入法」；若仍不可选，请重新登录。")
+              TISSelectInputSource(source) == noErr,
+              InputSourceStatus.isOurMode(InputSourceStatus.currentID) else {
+            throw InstallFailure(message:"暂未确认方寸已被选中，请从系统输入菜单选择「方寸输入法」。")
         }
     }
 }

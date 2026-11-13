@@ -79,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   let bundleID = Bundle.main.bundleIdentifier else { throw AppError.message("缺少输入法注册信息。") }
             server = IMKServer(name:connection,bundleIdentifier:bundleID)
             if server == nil { throw AppError.message("无法启动系统输入法服务。") }
+            InstallationRuntime.shared.start()
             NSLog("TranslateType input method server ready")
             AppPresence.shared.start()
             openRequestedSettings(arguments:CommandLine.arguments)

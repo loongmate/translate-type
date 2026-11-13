@@ -22,7 +22,7 @@ final class InstallTransaction {
     static let bundleID = "com.translatetype.inputmethod.TranslateType"
     private static let acceptedIDs = [bundleID,"com.fangcun.inputmethod.FangCun","com.apple.inputmethod.translatetype"]
     private static let names = ["FangCun.app","方寸输入法.app","TranslateType.app"]
-    let destination: URL
+    private(set) var destination: URL
     private(set) var previous: URL?
     let backup: URL
     let staging: URL
@@ -74,6 +74,9 @@ final class InstallTransaction {
                 throw InstallFailure(message:"输入法目录中有多个方寸副本，请先保留一个，再重新安装。现有副本未改动。")
             }
             previous = candidates.first
+            // Retain an existing installation's path, including legacy names:
+            // moving it away can invalidate the system's input-source cache.
+            if let previous { destination = previous }
         } catch {
             flock(lock,LOCK_UN); close(lock); lock = -1
             throw error
@@ -95,29 +98,43 @@ final class InstallTransaction {
         try fileManager.copyItem(at:payload,to:staging)
         try verify(staging)
     }
+    private static func rename(_ source:URL,_ target:URL,flags:UInt32) throws {
+        guard renameatx_np(AT_FDCWD,source.path,AT_FDCWD,target.path,flags) == 0 else {
+            let reason = String(cString:strerror(errno))
+            throw InstallFailure(message:"无法原子替换输入法应用：\(reason)。现有安装保留，请重试。")
+        }
+    }
     func replace() throws {
-        guard fileManager.fileExists(atPath:staging.path) else { throw InstallFailure(message:"安装文件尚未准备好。") }
+        guard !replaced, fileManager.fileExists(atPath:staging.path) else { throw InstallFailure(message:"安装文件尚未准备好。") }
         if let previous {
             try fileManager.createDirectory(at:backup.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
-            try fileManager.moveItem(at:previous,to:backup)
+            // Copy the backup while the installed path remains present. After
+            // the swap, staging retains the old directory for atomic rollback.
+            try fileManager.copyItem(at:previous,to:backup)
             backedUp = true
+            do { try Self.rename(staging,destination,flags:UInt32(RENAME_SWAP)) }
+            catch {
+                try? fileManager.removeItem(at:backup); backedUp = false
+                throw error
+            }
+        } else {
+            // Do not overwrite an installation created after the initial check.
+            try Self.rename(staging,destination,flags:UInt32(RENAME_EXCL))
         }
-        do {
-            try fileManager.moveItem(at:staging,to:destination)
-            replaced = true
-        } catch {
-            try rollback()
-            throw error
-        }
+        replaced = true
     }
     func rollback() throws {
         if replaced {
-            try fileManager.removeItem(at:destination)
+            if previous != nil {
+                // Keep the registered path continuously present on failure too.
+                do { try Self.rename(staging,destination,flags:UInt32(RENAME_SWAP)) }
+                catch { throw InstallFailure(message:"旧版备份保留在 \(backup.path)，但无法自动恢复：\(error.localizedDescription)") }
+            } else { try fileManager.removeItem(at:destination) }
             replaced = false
         }
-        if backedUp, let previous {
-            do { try fileManager.moveItem(at:backup,to:previous); backedUp = false }
-            catch { throw InstallFailure(message:"旧版仍保存在 \(backup.path)，但自动恢复失败：\(error.localizedDescription)") }
+        if backedUp {
+            try fileManager.removeItem(at:backup)
+            backedUp = false
         }
     }
 }

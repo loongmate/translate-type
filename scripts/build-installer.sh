@@ -8,7 +8,7 @@ case "$ARCH" in x86_64|arm64) ;; *) exit 2 ;; esac
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 mkdir -p "$INSTALLER/Contents/MacOS" "$INSTALLER/Contents/Resources"
 swiftc -swift-version 5 -parse-as-library -O -target "$ARCH-apple-macosx13.0" -sdk "$SDK" \
-    Installer/*.swift Sources/InputSourceStatus.swift -framework AppKit -framework Carbon \
+    Installer/*.swift Sources/InputSourceStatus.swift Sources/InstallationRuntime.swift -framework AppKit -framework Carbon \
     -o "$INSTALLER/Contents/MacOS/FangCunInstaller"
 cp Installer/Info.plist "$INSTALLER/Contents/Info.plist"
 python3 - "$PAYLOAD/Contents/Info.plist" "$INSTALLER/Contents/Info.plist" <<'PY'

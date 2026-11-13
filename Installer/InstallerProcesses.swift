@@ -16,15 +16,15 @@ struct InstallerProcess {
 /// installation directory. The installer itself has a different bundle ID.
 @MainActor final class InstallerProcesses {
     private let inventory:@MainActor ()->[InstallerProcess]
-    private let requestStop:@MainActor (pid_t,Bool)->Void
+    private let requestStop:@MainActor (pid_t)->Bool
     private let delay:UInt64
     init(inventory:@escaping @MainActor ()->[InstallerProcess] = {
         NSWorkspace.shared.runningApplications.filter { !$0.isTerminated }.map {
             InstallerProcess(pid:$0.processIdentifier,bundleID:$0.bundleIdentifier,bundleURL:$0.bundleURL,executableURL:$0.executableURL)
         }
-    },requestStop:@escaping @MainActor (pid_t,Bool)->Void = { pid,force in
-        guard let app = NSRunningApplication(processIdentifier:pid) else { return }
-        if force { _ = app.forceTerminate() } else { _ = app.terminate() }
+    },requestStop:@escaping @MainActor (pid_t)->Bool = { pid in
+        guard let app = NSRunningApplication(processIdentifier:pid) else { return true }
+        return app.terminate()
     },delay:UInt64 = 100_000_000) {
         self.inventory = inventory; self.requestStop = requestStop; self.delay = delay
     }
@@ -40,9 +40,9 @@ struct InstallerProcess {
         }
     }
     func stopAll() async throws -> Set<pid_t> {
-        var stopped:Set<pid_t> = [], forced:Set<pid_t> = []
+        var stopped:Set<pid_t> = []
         var quiet = 0
-        for attempt in 0..<50 {
+        for _ in 0..<100 {
             let processes = inputMethods()
             if processes.isEmpty {
                 quiet += 1
@@ -50,33 +50,34 @@ struct InstallerProcess {
             } else {
                 quiet = 0
                 for process in processes {
-                    if stopped.insert(process.pid).inserted { requestStop(process.pid,false) }
-                    if attempt >= 30 && forced.insert(process.pid).inserted { requestStop(process.pid,true) }
+                    if stopped.insert(process.pid).inserted, !requestStop(process.pid) {
+                        throw InstallFailure(message:"方寸暂时无法正常退出，应用未替换。请结束当前输入或关闭方寸设置后重试。")
+                    }
                 }
             }
             try await Task.sleep(nanoseconds:delay)
         }
-        throw InstallFailure(message:"仍有方寸进程未退出，应用未替换。请保存文字、切换到 ABC，再退出登录后重试。")
+        throw InstallFailure(message:"方寸退出超时，应用未替换。请结束当前输入或关闭方寸设置后重试。")
     }
     func verifyLaunch(at url:URL,pid:pid_t,stopped:Set<pid_t>) async throws {
         for _ in 0..<50 {
             let processes = inputMethods()
             if processes.count > 1 {
-                throw InstallFailure(message:"检测到多个方寸进程，更新尚未生效。请切换到 ABC，退出登录后重新安装。")
+                throw InstallFailure(message:"检测到多个方寸进程，更新尚未生效。请切换到 ABC 后重试安装。")
             }
             if let process = processes.first {
                 guard process.pid == pid, !stopped.contains(pid) else {
-                    throw InstallFailure(message:"系统仍在运行其他位置或旧的方寸进程，更新尚未生效。请退出登录后重新安装。")
+                    throw InstallFailure(message:"系统仍在运行其他位置或旧的方寸进程，更新尚未生效。请重试安装。")
                 }
                 if process.bundleURL != nil && process.executableURL != nil {
                     guard process.matchesInstallation(url) else {
-                        throw InstallFailure(message:"系统启动的方寸不在本次安装目录，更新尚未生效。请退出登录后重新安装。")
+                        throw InstallFailure(message:"系统启动的方寸不在本次安装目录，更新尚未生效。请重试安装。")
                     }
                     return
                 }
             }
             try await Task.sleep(nanoseconds:delay)
         }
-        throw InstallFailure(message:"未能确认新版方寸进程已启动，请退出登录后重新安装。")
+        throw InstallFailure(message:"未能确认新版方寸进程已启动，请重试安装。")
     }
 }
