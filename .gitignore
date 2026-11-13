@@ -12,3 +12,7 @@ dist/
 *.key
 *.mobileprovision
 *.provisionprofile
+
+# 本地生成产物与工具会话目录
+output/
+.loong/
