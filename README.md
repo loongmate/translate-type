@@ -4,16 +4,16 @@ macOS 原生输入法：离线中文拼音 + 用户主动触发的 AI 文字处�
 
 ## 下载预览版
 
-[0.1.0-beta.5（build 45）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.5) 提供 macOS 13+ 的自动安装 DMG：
+[0.1.0-beta.6（build 47）](https://github.com/loongmate/translate-type/releases/tag/v0.1.0-beta.6) 提供 macOS 13+ 的自动安装 DMG：
 
-- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.5/FangCun-0.1.0-build45-AppleSilicon-installer.dmg)
-- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.5/FangCun-0.1.0-build45-Intel-installer.dmg)
+- [Apple Silicon（M 系列）下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.6/FangCun-0.1.0-build47-AppleSilicon-installer.dmg)
+- [Intel 下载](https://github.com/loongmate/translate-type/releases/download/v0.1.0-beta.6/FangCun-0.1.0-build47-Intel-installer.dmg)
 
-打开 DMG，双击「安装方寸输入法」并点击安装。安装器自动复制到当前用户的输入法目录、注册并尝试启用，首次安装完成后可点击「开始使用」。覆盖升级会显示「需要重新登录」：请先保存所有工作，再退出登录并重新登录，以重建已打开应用的输入会话；只关闭安装器或锁屏无效。升级保留配置和词库。输入法、安装器和 DMG 均有 Developer ID 正式签名并通过 Apple 公证。实测环境为 Intel / macOS 14.7.4，Apple Silicon 尚待真机验收。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.5.md)。
+打开 DMG，双击「安装方寸输入法」并点击安装。若首次安装提示「需要重新登录」，请保存工作后退出登录并重新登录。升级保留配置和词库。升级后若原应用窗口无法继续输入，请重新登录后再选择方寸。两种架构的输入法、安装器和 DMG 均已签名并通过 Apple 公证。详见 [安装、升级与发布说明](docs/releases/v0.1.0-beta.6.md)。
 
 ## 本机构建和安装
 
-需要 macOS 13+、Xcode Command Line Tools 和 Python 3。当前开发验证机器为 macOS 14.7.4 / Intel。
+需要 macOS 13+、Xcode Command Line Tools 和 Python 3。
 
 ```sh
 ./scripts/bootstrap.sh
