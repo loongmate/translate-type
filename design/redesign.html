@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>方寸 · 新设计预览</title>
+  <link rel="stylesheet" href="assets/redesign.css">
+  <script defer src="assets/lucide.min.js"></script>
+  <script defer src="assets/redesign.js"></script>
+</head>
+<body>
+  <header class="review-bar">
+    <a class="brand" href="#editor"><span class="brand-mark">方</span><strong>方寸</strong><span class="edition">DESIGN EXPLORATION / 01</span></a>
+    <nav class="page-switch" aria-label="选择设计页面"><button data-page="editor" aria-pressed="true">临时编辑器</button><button data-page="ai" aria-pressed="false">问问 AI</button></nav>
+    <button class="icon-button theme-toggle" id="theme" aria-label="切换深色外观" title="切换深色外观"><i data-lucide="moon"></i></button>
+  </header>
+  <main class="review">
+    <div class="intro"><div><p class="eyebrow" id="screenNumber">01 / SCRATCHPAD</p><h1 id="headline">给想法，一点舒展的空间。</h1><p id="description">随手记下，即时预览。一个安静、轻巧的临时编辑器。</p></div><span class="concept-label"><span></span>静谧紫 · 桌面原生感</span></div>
+
+    <section class="app-window" id="appWindow" aria-label="方寸设计预览">
+      <header class="titlebar"><span class="window-symbol"><i data-lucide="command"></i></span><div class="window-name"><strong id="windowTitle">临时编辑器</strong><span>方寸</span></div><div class="titlebar-right"><span class="saved" id="saveState"><i data-lucide="check"></i>草稿已保存</span><button class="icon-button" id="focus" aria-label="切换专注视图" title="切换专注视图"><i data-lucide="maximize-2"></i></button></div></header>
+
+      <section id="editorPage" class="editor-page" aria-label="临时编辑器">
+        <div class="editor-toolbar"><div class="file-identity"><i data-lucide="file-text"></i><span id="filename">随手记.md</span><span class="tiny-badge">临时草稿</span></div><div class="toolbar-actions"><button class="text-button" id="open"><i data-lucide="folder-open"></i><span>打开</span></button><button class="text-button" id="save"><i data-lucide="download"></i><span>另存为</span></button><span class="toolbar-divider"></span><button class="preview-toggle" id="togglePreview" aria-pressed="true"><i data-lucide="panel-right"></i>预览</button></div></div>
+        <div class="find-bar" id="findBar" hidden><i data-lucide="search"></i><input id="findInput" aria-label="查找文字" placeholder="查找文字…"><span id="findCount"></span><button class="text-button" id="findNext">下一个</button><button class="icon-button" id="closeFind" aria-label="关闭查找"><i data-lucide="x"></i></button></div>
+        <div class="editor-split" id="editorSplit">
+          <section class="source-pane"><header class="pane-label"><span>编辑</span><div><button class="icon-button small" id="find" aria-label="查找文字" title="查找 · ⌘F"><i data-lucide="search"></i></button><button class="icon-button small" id="copySource" aria-label="复制编辑内容" title="复制编辑内容"><i data-lucide="copy"></i></button></div></header><div class="code-editor"><div class="line-numbers" id="lineNumbers" aria-hidden="true"></div><div class="code-surface"><pre id="highlight" aria-hidden="true"></pre><textarea id="source" aria-label="临时编辑器文本" spellcheck="false" wrap="off"></textarea></div></div></section>
+          <section class="preview-pane" id="previewPane" aria-label="文档预览"><header class="pane-label"><span>预览<span class="live-label">实时更新</span></span><i data-lucide="book-open"></i></header><article id="rendered" class="rendered"></article></section>
+        </div>
+        <footer class="editor-status"><div><span class="status-dot"></span><span id="characterCount"></span><span class="status-separator">/</span><span id="cursorPosition">第 1 行，第 1 列</span></div><div><label><select id="format" aria-label="文档格式"><option value="markdown">Markdown</option><option value="html">HTML</option><option value="json">JSON</option><option value="text">纯文本</option></select></label><span class="status-separator">/</span><span>UTF-8</span><span class="status-separator">/</span><span>中</span></div></footer>
+      </section>
+
+      <section id="aiPage" class="ai-page" aria-label="问问 AI" hidden>
+        <aside class="sidebar"><button class="new-chat" id="newChat"><i data-lucide="square-pen"></i>新对话<kbd>⌘ N</kbd></button><div class="sidebar-caption">今天</div><button class="conversation active" data-chat="plan"><i data-lucide="message-square"></i><span>整理这周的想法</span></button><button class="conversation" data-chat="email"><i data-lucide="message-square"></i><span>帮我写一封回复</span></button><div class="sidebar-caption yesterday">昨天</div><button class="conversation" data-chat="code"><i data-lucide="message-square"></i><span>读懂这段代码</span></button><div class="sidebar-bottom"><div class="workspace-caption">工作目录</div><button class="workspace" id="directory"><i data-lucide="folder"></i><span id="directoryName">我的文稿</span><i data-lucide="chevrons-up-down"></i></button><p>文件与命令从这里开始</p></div></aside>
+        <div class="chat-main"><div class="chat-header"><div><strong id="chatTitle">整理这周的想法</strong><span>问问 AI</span></div><span class="demo-badge">示例对话</span></div>
+          <div class="chat-scroll" id="chatScroll"><div class="messages" id="messages"></div></div>
+          <div class="composer-area"><div class="suggestions" id="suggestions"><button data-prompt="把这些想法整理成待办清单">整理成待办</button><button data-prompt="帮我写一封自然、简洁的邮件回复">帮我写回复</button><button data-prompt="解释这段代码的思路">解释代码</button></div><form class="composer" id="chatForm"><textarea id="chatInput" aria-label="发送给问问 AI 的消息" rows="2" placeholder="说说你想做什么，剩下的交给方寸…"></textarea><div class="composer-toolbar"><button type="button" class="text-button" id="attach"><i data-lucide="paperclip"></i>参考文字</button><div><span class="input-language">中 <span>⇧</span></span><span class="composer-key">⌃ Enter 发送</span><button class="send-button" id="send" aria-label="发送消息"><i data-lucide="arrow-up"></i></button><button type="button" class="send-button" id="stop" aria-label="停止生成" hidden><i data-lucide="square"></i></button></div></div></form><div class="chat-footer"><span><span class="status-dot"></span>按需调用工具，过程随时可见</span><button class="text-button insert-answer" id="insertAnswer"><i data-lucide="corner-down-left"></i>插入回答 <kbd>⌘ ↵</kbd></button></div></div>
+        </div>
+      </section>
+    </section>
+    <footer class="review-footer"><span id="designNote">更少的边框，更好的留白。让编辑与阅读各得其所。</span><span>HTML 交互原型 · AI 与工具结果均为演示</span></footer>
+  </main>
+  <input type="file" id="fileInput" accept=".txt,.md,.markdown,.html,.json,.css,.js,.swift" hidden>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <dialog id="referenceDialog"><form id="referenceForm"><header><h2>附上参考文字</h2><button type="button" class="icon-button" id="closeReference" aria-label="关闭参考文字"><i data-lucide="x"></i></button></header><p>把邮件、代码或资料放在这里，随下一条消息一起使用。</p><textarea id="reference" aria-label="参考文字" placeholder="粘贴参考内容…"></textarea><footer><button class="primary" type="submit">附加到下一条消息</button></footer></form></dialog>
+  <dialog id="directoryDialog"><form id="directoryForm"><header><h2>工作目录</h2><button type="button" class="icon-button" id="closeDirectory" aria-label="关闭工作目录"><i data-lucide="x"></i></button></header><p>在原生应用中选择文件夹。此处仅预览目录显示效果。</p><label>目录名称<input id="directoryInput" required value="我的文稿" maxlength="40"></label><footer><button class="primary" type="submit">使用此目录</button></footer></form></dialog>
+  <dialog id="insertDialog"><header><h2>插入回答预览</h2><button class="icon-button" id="closeInsert" aria-label="关闭插入预览"><i data-lucide="x"></i></button></header><p>这里模拟原应用的输入框，可检查插入的文字。</p><textarea id="insertTarget" aria-label="模拟原应用输入框"></textarea><footer><span>HTML 演示，不连接真实应用</span><button class="primary" id="finishInsert">完成</button></footer></dialog>
+</body>
+</html>

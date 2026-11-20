@@ -33,7 +33,7 @@ actor ScratchpadRenderer {
     private var context: JSContext?
     private let library: URL?
     init(library:URL? = Bundle.main.url(forResource:"marked-18.1.1.umd",withExtension:"js",subdirectory:"Preview")) { self.library = library }
-    func render(_ text:String,format:ScratchpadFormat,filename:String? = nil) throws -> ScratchpadPreview {
+    func render(_ text:String,format:ScratchpadFormat,filename:String? = nil,dark:Bool = false) throws -> ScratchpadPreview {
         try Task.checkCancellation()
         let kind = format == .automatic ? ScratchpadFormat.detect(text,filename:filename) : format
         let limit = 200_000, content = String(text.prefix(limit))
@@ -64,6 +64,14 @@ actor ScratchpadRenderer {
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <style>
         :root{color-scheme:light;accent-color:#7857c2}*{box-sizing:border-box}body{margin:0;padding:28px;color:#272330;background:#fff;font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3;margin:1.4em 0 .65em}h1{font-size:28px}h2{font-size:22px;border-bottom:1px solid #e9e4ef;padding-bottom:8px}h3{font-size:18px}body>:first-child{margin-top:0}a{color:#7857c2}pre{padding:16px;background:#f7f5fa;border-radius:8px;overflow:auto;white-space:pre-wrap;word-break:normal}pre.plain{padding:0;background:transparent;font:inherit;white-space:pre-wrap}code{font:13px/1.6 ui-monospace,Menlo,monospace;background:#f3f0f7;border-radius:4px;padding:2px 4px}pre code{padding:0;background:none}blockquote{margin-left:0;padding-left:16px;border-left:3px solid #ab96d1;color:#6b6278}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #e3ddea;padding:8px 12px;text-align:left}th{background:#f8f5fc}img,svg,video{max-width:100%;height:auto}hr{border:0;border-top:1px solid #e3ddea}input[type=checkbox]{margin-right:8px}
+        :root{color-scheme:\(dark ? "dark" : "light");accent-color:\(dark ? "#b09bd8" : "#7960bb")}
+        body{padding:8px 36px 36px;background:\(dark ? "#2c2933" : "#fff");color:\(dark ? "#e0dbe9" : "#2d2935");font-size:14px;line-height:1.95}
+        h1{font-size:26px;letter-spacing:.2px}h2{font-size:17px;border:0;padding:0}h3{font-size:15px}h1,h2,h3{font-weight:600;line-height:1.5}
+        p,li{color:\(dark ? "#c1b8cd" : "#716a7e")}li{margin:4px 0}
+        pre,th{background:\(dark ? "#29262f" : "#faf9fc")}code{background:\(dark ? "#3b324c" : "#eee9f7");color:\(dark ? "#b09bd8" : "#7960bb")}
+        blockquote{border-left:2px solid #b7a0d3;background:\(dark ? "#29262f" : "#faf9fc");padding:8px 14px;color:\(dark ? "#afa6ba" : "#807b8c")}
+        td,th,hr{border-color:\(dark ? "#3a3443" : "#eeecf2")}a{color:\(dark ? "#b09bd8" : "#7960bb")}
+        li:has(>input[type=checkbox]){list-style:none;margin-left:-20px}
         </style></head><body>\(body)</body></html>
         """
         return ScratchpadPreview(html:document,format:kind,note:note)

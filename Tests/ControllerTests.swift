@@ -207,7 +207,7 @@ import Carbon
                 if translating { key("e",14,flags:[.control,.shift]) }
                 let before = client.text.string
                 var expectedSymbols = before
-                for text in ["test@example.com","foo_bar_v2","cmd|grep","obj{key}","var$value","path~backup"] {
+                for text in ["test@example.com","foo_bar_v2","cmd|grep","obj{key}","var$value","path~backup","baidu.com","www.baidu.com"] {
                     type(text)
                     precondition(client.text.string == expectedSymbols+text && client.text.hasMarkedText(),"\(text)：真实输入框符号不自动选词或上屏")
                     key(" ",49)
@@ -239,8 +239,10 @@ import Carbon
                 }
                 check(beforeBare+corrected,"\(layout.name) / \(translating ? "译英" : "中文")：实际控制器的网址、数字符号、光标编辑与 Enter 原样确认")
                 type(layout == .sogou ? "nihk" : "nihao"); key(".",47)
-                if translating { key("\r",36) }
-                check(beforeBare+corrected+"你好。","\(layout.name)：原文片段后恢复中文，拼音后直接按句号得到你好。")
+                precondition(client.text.string == beforeBare+corrected+"你好。" && client.text.hasMarkedText(),"未选拼音后的中文句号显示在真实预编辑区")
+                if translating { key("\r",36); key("\r",36) }
+                else { controller.commitComposition(client) }
+                check(beforeBare+corrected+"你好。","\(layout.name)：原文确认后恢复中文，待定句号在确认草稿或宿主提交时上屏")
                 let beforePunctuation = client.text.string
                 var expectedPunctuation = beforePunctuation
                 let punctuationKeys: [(String,UInt16,NSEvent.ModifierFlags,String)] = [

@@ -221,6 +221,10 @@ final class CompositionSession {
         onUpdate?()
     }
     private func commitRawInput() {
+        if engine.hasPendingPeriod {
+            consume(engine.commit(preservePeriodSuffix:true))
+            return
+        }
         let input = snapshot.input
         engine.clear(); snapshot = .empty
         applyPendingPinyinLayout()
@@ -369,12 +373,12 @@ final class CompositionSession {
         if key == 0xff08 && snapshot.preedit.isEmpty && !draft.isEmpty {
             invalidateTranslation(); draft.removeLast(); draftSelection = NSRange(location:draft.utf16.count,length:0); onUpdate?(); return true
         }
-        if engine.isLiteralInput && key == 0xff09 {
+        if (engine.isLiteralInput || engine.hasPendingPeriod) && key == 0xff09 {
             if isInEditor { commitRawInput(); insertEditorText("\t"); return true }
             flushOriginal(); return false
         }
         if key == 0xff09 && translateEnabled && !markedText.isEmpty { flushOriginal(); return false }
-        if !asciiMode && !engine.isLiteralInput && hasPendingInput && !snapshot.candidates.isEmpty && [45,61,43].contains(key) {
+        if !asciiMode && !engine.isLiteralInput && !engine.hasPendingPeriod && hasPendingInput && !snapshot.candidates.isEmpty && [45,61,43].contains(key) {
             // - goes back; both = and Shift+= (+) go forward. Strip Shift
             // for the page action, and consume boundary keys without inserting
             // punctuation or implicitly confirming the highlighted candidate.

@@ -18,9 +18,14 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
     private let renderer: ScratchpadRenderer
     private let candidates = CandidatePanel()
     private let formatPicker = NSPopUpButton()
-    private let previewToggle = NSButton()
-    private let language = NSButton()
+    private let previewToggle = WorkspaceButton("预览",symbol:"sidebar.right",target:nil,action:nil,kind:.soft)
+    private let language = WorkspaceButton("中 ⇧",target:nil,action:nil)
     private let status = NSTextField(labelWithString:"")
+    private let fileLabel = WorkspaceStyle.label("未命名",size:12,color:WorkspaceStyle.ink)
+    private let savedLabel = WorkspaceStyle.label("已自动保存",size:10)
+    private var lineNumbers: WorkspaceLineNumbers?
+    private var previewSurface: NSView?
+    private var highlightedText: String?, highlightedFormat: ScratchpadFormat?
     private let previewLabel = NSTextField(labelWithString:"预览")
     private let previewBox = NSStackView()
     private let content = NSStackView()
@@ -80,18 +85,24 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
         }
         previousSelection = state.draftSelection
         if textView.string != state.markedText { textView.string = state.markedText }
-        let range = NSRange(location:0,length:textView.string.utf16.count)
-        textView.textStorage?.setAttributes([.font:NSFont.monospacedSystemFont(ofSize:14,weight:.regular),.foregroundColor:NSColor.labelColor],range:range)
+        if highlightedText != textView.string || highlightedFormat != resolvedFormat {
+            WorkspaceSyntax.apply(to:textView,format:resolvedFormat)
+            highlightedText = textView.string; highlightedFormat = resolvedFormat
+        }
         if state.hasPendingInput { textView.textStorage?.addAttribute(.underlineStyle,value:NSUnderlineStyle.single.rawValue,range:NSRange(location:state.pendingTextStart,length:state.snapshot.preedit.utf16.count)) }
         textView.setSelectedRange(state.hasPendingInput ? NSRange(location:state.markedCaret,length:0) : state.draftSelection)
         textView.scrollRangeToVisible(textView.selectedRange())
         language.title = (state.asciiMode ? "英文" : state.pinyinLayout.shortName) + " ⇧"
         if window.isKeyWindow { AppPresence.shared.updateInputLanguage(asciiMode:state.asciiMode) }
         previewBox.isHidden = !previewVisible
-        previewToggle.title = previewVisible ? "收起预览 ◂" : "展开预览 ▸"
+        previewSurface?.isHidden = !previewVisible
+        previewToggle.title = "预览"
+        previewToggle.toolTip = previewVisible ? "收起预览 · ⇧⌘P" : "展开预览 · ⇧⌘P"
         previewToggle.state = previewVisible ? .on : .off
         formatPicker.selectItem(at:ScratchpadFormat.allCases.firstIndex(of:format) ?? 0)
         window.title = "方寸 · 临时编辑器" + (filename.map { " · " + $0 } ?? "")
+        fileLabel.stringValue = filename ?? "未命名"
+        lineNumbers?.update(textView.string)
         rendering = false
         updateStatus(); schedulePreview(); persist(); refreshCandidates()
     }
@@ -100,8 +111,9 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
         let range = textView.selectedRange(), caret = min(range.location,(state.draft as NSString).length)
         let prefix = (state.draft as NSString).substring(to:caret)
         let line = prefix.reduce(1) { $1 == "\n" ? $0+1 : $0 }
-        status.stringValue = message ?? (state.hasPendingInput ? "空格确认候选 · Esc 取消选词" : "\(state.draft.count) 字 · 第 \(line) 行" + (range.length > 0 ? " · 已选 \(range.length) 字" : "") + " · " + saveState)
-        status.textColor = message == nil ? .secondaryLabelColor : .systemOrange
+        status.stringValue = message ?? (state.hasPendingInput ? "空格确认候选 · Esc 取消选词" : "\(state.draft.count) 字  /  第 \(line) 行" + (range.length > 0 ? " · 已选 \(range.length) 字" : ""))
+        status.textColor = message == nil ? WorkspaceStyle.muted : .systemOrange
+        savedLabel.stringValue = saveState
     }
     func textDidChange(_ notification:Notification) {
         guard !rendering, let state = session else { return }
@@ -221,7 +233,8 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
     }
     private func schedulePreview() {
         guard previewVisible, let state = session else { return }; ensureWebView()
-        let signature = [state.draft,format.rawValue,filename ?? ""]
+        let dark = window.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == .darkAqua
+        let signature = [state.draft,format.rawValue,filename ?? "",String(dark)]
         guard signature != previewSignature else { return }; previewSignature = signature
         previewTask?.cancel(); revision = UUID(); let token = revision
         let text = state.draft, selected = format, name = filename
@@ -230,7 +243,7 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
             do {
                 try await Task.sleep(nanoseconds:180_000_000)
                 guard let self else { return }
-                let snapshot = try await self.renderer.render(text,format:selected,filename:name)
+                let snapshot = try await self.renderer.render(text,format:selected,filename:name,dark:dark)
                 try Task.checkCancellation(); guard self.revision == token, self.previewVisible else { return }
                 self.renderedPreview = snapshot
                 self.previewLabel.stringValue = "预览 · " + snapshot.format.title + (snapshot.note.map { " · " + $0 } ?? "")
@@ -271,47 +284,83 @@ final class ScratchpadEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, Dr
             }
         }
     }
+    @objc private func toggleAppearance() { WorkspaceStyle.toggleAppearance(for:window) }
+    @objc private func appearanceChanged() {
+        window.appearance = WorkspaceStyle.appearance
+        highlightedText = nil; previewSignature = []
+        refresh()
+    }
+    @objc private func zoomWindow() { window.zoom(nil) }
     private func build() {
-        window = ScratchpadWindow(contentRect:NSRect(x:0,y:0,width:760,height:640),styleMask:[.titled,.closable,.resizable,.nonactivatingPanel],backing:.buffered,defer:false)
+        window = ScratchpadWindow(contentRect:NSRect(x:0,y:0,width:1040,height:680),styleMask:[.titled,.closable,.resizable,.nonactivatingPanel],backing:.buffered,defer:false)
         window.owner = self; window.delegate = self; window.isReleasedWhenClosed = false; window.isFloatingPanel = true; window.hidesOnDeactivate = false
         window.level = .floating; window.becomesKeyOnlyIfNeeded = false; window.collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]
-        window.minSize = NSSize(width:650,height:420); window.appearance = NSAppearance(named:.aqua)
-        window.backgroundColor = NSColor(calibratedRed:0.98,green:0.97,blue:0.99,alpha:1)
+        window.minSize = NSSize(width:720,height:460); window.appearance = WorkspaceStyle.appearance
+        window.titlebarAppearsTransparent = true; window.backgroundColor = WorkspaceStyle.soft
         window.setFrameAutosaveName("FangCunScratchpad"); window.center()
-        let root = NSStackView(); root.orientation = .vertical; root.spacing = 12; root.edgeInsets = NSEdgeInsets(top:14,left:16,bottom:12,right:16)
-        root.translatesAutoresizingMaskIntoConstraints = false; window.contentView!.addSubview(root)
-        NSLayoutConstraint.activate([root.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor),root.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor),root.topAnchor.constraint(equalTo:window.contentView!.topAnchor),root.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor)])
-        func full(_ view:NSView) { root.addArrangedSubview(view); view.widthAnchor.constraint(equalTo:root.widthAnchor,constant:-32).isActive = true }
-        func button(_ title:String,_ action:Selector) -> NSButton { let b = NSButton(title:title,target:self,action:action); b.bezelStyle = .rounded; b.font = .systemFont(ofSize:12); return b }
-        let tools = NSStackView(); tools.orientation = .horizontal; tools.spacing = 8
-        for (title,action) in [("新建",#selector(clearText)),("打开…",#selector(openFile)),("另存…",#selector(saveFile)),("复制",#selector(copyText)),("查找",#selector(findText))] { tools.addArrangedSubview(button(title,action)) }
-        let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow,for:.horizontal); tools.addArrangedSubview(spacer)
-        previewToggle.target = self; previewToggle.action = #selector(togglePreview); previewToggle.bezelStyle = .rounded; previewToggle.bezelColor = Self.accent; previewToggle.contentTintColor = .white
-        tools.addArrangedSubview(previewToggle); full(tools)
-        content.orientation = .horizontal; content.spacing = 14; content.distribution = .fillEqually; content.alignment = .top
-        let left = NSStackView(); left.orientation = .vertical; left.alignment = .leading; left.spacing = 8; editorBox = left
-        let heading = NSStackView(); heading.orientation = .horizontal
-        let label = NSTextField(labelWithString:"文本"); label.font = .systemFont(ofSize:12,weight:.medium); heading.addArrangedSubview(label)
-        let gap = NSView(); gap.setContentHuggingPriority(.defaultLow,for:.horizontal); heading.addArrangedSubview(gap)
-        formatPicker.addItems(withTitles:ScratchpadFormat.allCases.map(\.title)); formatPicker.target = self; formatPicker.action = #selector(changeFormat); heading.addArrangedSubview(formatPicker)
-        left.addArrangedSubview(heading); heading.widthAnchor.constraint(equalTo:left.widthAnchor).isActive = true
-        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.borderType = .bezelBorder
+        let backdrop = WorkspaceSurface()
+        window.contentView = backdrop
+        let root = WorkspaceStyle.column(); backdrop.addSubview(root); WorkspaceStyle.pin(root,to:backdrop)
+        backdrop.onAppearanceChange = { [weak self] in
+            guard let self, self.session != nil else { return }
+            self.highlightedText = nil; self.previewSignature = []
+            DispatchQueue.main.async { [weak self] in self?.refresh() }
+        }
+        NotificationCenter.default.addObserver(self,selector:#selector(appearanceChanged),name:WorkspaceStyle.themeChanged,object:nil)
+        func button(_ title:String,_ symbol:String,_ action:Selector) -> WorkspaceButton { WorkspaceButton(title,symbol:symbol,target:self,action:action) }
+        let toolbar = WorkspaceStyle.row(spacing:8); toolbar.heightAnchor.constraint(equalToConstant:50).isActive = true; toolbar.edgeInsets = NSEdgeInsets(top:10,left:20,bottom:10,right:18)
+        let fileIcon = NSImageView(image:WorkspaceStyle.symbol("doc.text")!); fileIcon.contentTintColor = WorkspaceStyle.accent
+        toolbar.addArrangedSubview(fileIcon); toolbar.addArrangedSubview(fileLabel)
+        toolbar.addArrangedSubview(WorkspaceStyle.label("临时草稿",size:10,color:WorkspaceStyle.subtle)); toolbar.addArrangedSubview(WorkspaceStyle.spacer())
+        toolbar.addArrangedSubview(savedLabel)
+        let clear = button("","square.and.pencil",#selector(clearText)); clear.toolTip = "新建空白草稿"; clear.setAccessibilityLabel("新建空白草稿"); toolbar.addArrangedSubview(clear)
+        toolbar.addArrangedSubview(button("打开","folder",#selector(openFile)))
+        toolbar.addArrangedSubview(button("另存为","square.and.arrow.down",#selector(saveFile)))
+        previewToggle.target = self; previewToggle.action = #selector(togglePreview); toolbar.addArrangedSubview(previewToggle)
+        let theme = button("","moon",#selector(toggleAppearance)); theme.setAccessibilityLabel("切换浅色或深色外观"); theme.toolTip = "切换浅色或深色外观"; toolbar.addArrangedSubview(theme)
+        let zoom = button("","arrow.up.left.and.arrow.down.right",#selector(zoomWindow)); zoom.setAccessibilityLabel("放大窗口"); toolbar.addArrangedSubview(zoom)
+        WorkspaceStyle.fillWidth(toolbar,in:root)
+        let divider = NSBox(); divider.boxType = .separator; WorkspaceStyle.fillWidth(divider,in:root)
+        content.orientation = .horizontal; content.spacing = 1; content.distribution = .fillEqually; content.alignment = .top
+        let sourceSurface = WorkspaceSurface(WorkspaceStyle.soft)
+        let left = WorkspaceStyle.column(); sourceSurface.addSubview(left); WorkspaceStyle.pin(left,to:sourceSurface); editorBox = left
+        let heading = WorkspaceStyle.row(); heading.heightAnchor.constraint(equalToConstant:46).isActive = true; heading.edgeInsets = NSEdgeInsets(top:8,left:20,bottom:8,right:16)
+        heading.addArrangedSubview(WorkspaceStyle.label("编辑",size:11)); heading.addArrangedSubview(WorkspaceStyle.spacer())
+        let find = button("","magnifyingglass",#selector(findText)); find.setAccessibilityLabel("查找文字"); find.toolTip = "查找 · ⌘F"; heading.addArrangedSubview(find)
+        let copy = button("","doc.on.doc",#selector(copyText)); copy.setAccessibilityLabel("复制编辑内容"); heading.addArrangedSubview(copy)
+        WorkspaceStyle.fillWidth(heading,in:left)
+        let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.borderType = .noBorder
+        scroll.drawsBackground = true; scroll.backgroundColor = WorkspaceStyle.soft
         textView.owner = self; textView.delegate = self; textView.isRichText = false; textView.allowsUndo = false; textView.usesFindBar = true; textView.isIncrementalSearchingEnabled = true
-        textView.font = .monospacedSystemFont(ofSize:14,weight:.regular); textView.textContainerInset = NSSize(width:16,height:14)
+        textView.font = .monospacedSystemFont(ofSize:14,weight:.regular); textView.textContainerInset = NSSize(width:12,height:8)
+        textView.backgroundColor = WorkspaceStyle.soft; textView.textColor = WorkspaceStyle.ink; textView.insertionPointColor = WorkspaceStyle.accent
+        textView.selectedTextAttributes = [.backgroundColor:WorkspaceStyle.tint,.foregroundColor:WorkspaceStyle.ink]
         textView.isAutomaticQuoteSubstitutionEnabled = false; textView.isAutomaticDashSubstitutionEnabled = false; textView.isAutomaticTextReplacementEnabled = false; textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isVerticallyResizable = true; textView.isHorizontallyResizable = false; textView.autoresizingMask = [.width]; textView.textContainer?.widthTracksTextView = true
         textView.maxSize = NSSize(width:CGFloat.greatestFiniteMagnitude,height:CGFloat.greatestFiniteMagnitude); textView.setAccessibilityLabel("临时编辑器文本")
-        scroll.documentView = textView; left.addArrangedSubview(scroll); scroll.widthAnchor.constraint(equalTo:left.widthAnchor).isActive = true
-        previewBox.orientation = .vertical; previewBox.alignment = .leading; previewBox.spacing = 8
-        previewLabel.font = .systemFont(ofSize:12,weight:.medium); previewLabel.lineBreakMode = .byTruncatingTail; previewBox.addArrangedSubview(previewLabel)
-        previewLabel.widthAnchor.constraint(equalTo:previewBox.widthAnchor).isActive = true
-        content.addArrangedSubview(left); content.addArrangedSubview(previewBox); full(content)
-        left.heightAnchor.constraint(equalTo:content.heightAnchor).isActive = true; previewBox.heightAnchor.constraint(equalTo:content.heightAnchor).isActive = true
-        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:220).isActive = true
-        let bottom = NSStackView(); bottom.orientation = .horizontal
-        status.font = .systemFont(ofSize:11); bottom.addArrangedSubview(status)
-        let bottomGap = NSView(); bottomGap.setContentHuggingPriority(.defaultLow,for:.horizontal); bottom.addArrangedSubview(bottomGap)
-        language.target = self; language.action = #selector(toggleLanguage); language.bezelStyle = .rounded; bottom.addArrangedSubview(language); full(bottom)
+        scroll.documentView = textView
+        let ruler = WorkspaceLineNumbers(scrollView:scroll,textView:textView); lineNumbers = ruler
+        scroll.verticalRulerView = ruler; scroll.hasVerticalRuler = true; scroll.rulersVisible = true
+        WorkspaceStyle.fillWidth(scroll,in:left); scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:220).isActive = true
+        let previewBackground = WorkspaceSurface(); previewSurface = previewBackground
+        previewBox.orientation = .vertical; previewBox.alignment = .leading; previewBox.spacing = 0
+        previewBackground.addSubview(previewBox); WorkspaceStyle.pin(previewBox,to:previewBackground)
+        let previewHeading = WorkspaceStyle.row(); previewHeading.heightAnchor.constraint(equalToConstant:46).isActive = true; previewHeading.edgeInsets = NSEdgeInsets(top:15,left:24,bottom:15,right:22)
+        previewLabel.font = .systemFont(ofSize:11); previewLabel.textColor = WorkspaceStyle.muted
+        previewHeading.addArrangedSubview(previewLabel); previewHeading.addArrangedSubview(WorkspaceStyle.label("实时更新",size:10,color:WorkspaceStyle.subtle)); previewHeading.addArrangedSubview(WorkspaceStyle.spacer())
+        let book = NSImageView(image:WorkspaceStyle.symbol("book")!); book.contentTintColor = WorkspaceStyle.subtle; previewHeading.addArrangedSubview(book)
+        WorkspaceStyle.fillWidth(previewHeading,in:previewBox)
+        content.addArrangedSubview(sourceSurface); content.addArrangedSubview(previewBackground); WorkspaceStyle.fillWidth(content,in:root)
+        sourceSurface.heightAnchor.constraint(equalTo:content.heightAnchor).isActive = true; previewBackground.heightAnchor.constraint(equalTo:content.heightAnchor).isActive = true
+        let bottomLine = NSBox(); bottomLine.boxType = .separator; WorkspaceStyle.fillWidth(bottomLine,in:root)
+        let bottom = WorkspaceStyle.row(spacing:8); bottom.heightAnchor.constraint(equalToConstant:38).isActive = true; bottom.edgeInsets = NSEdgeInsets(top:4,left:18,bottom:4,right:16)
+        status.font = .systemFont(ofSize:10); status.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
+        bottom.addArrangedSubview(status); bottom.addArrangedSubview(WorkspaceStyle.spacer())
+        formatPicker.addItems(withTitles:ScratchpadFormat.allCases.map(\.title)); formatPicker.target = self; formatPicker.action = #selector(changeFormat)
+        formatPicker.isBordered = false; formatPicker.font = .systemFont(ofSize:10); formatPicker.setAccessibilityLabel("文档格式"); bottom.addArrangedSubview(formatPicker)
+        bottom.addArrangedSubview(WorkspaceStyle.label("/  UTF-8  /",size:10,color:WorkspaceStyle.subtle))
+        language.target = self; language.action = #selector(toggleLanguage); language.toolTip = "Shift 切换中英文"; bottom.addArrangedSubview(language)
+        WorkspaceStyle.fillWidth(bottom,in:root)
         history.levelsOfUndo = 100
         layoutObserver = NotificationCenter.default.addObserver(forName:.pinyinLayoutChanged,object:nil,queue:.main) { [weak self] _ in
             MainActor.assumeIsolated { do { try self?.session?.requestPinyinLayout(ConfigurationStore.shared.pinyinLayout) } catch { self?.message = error.localizedDescription; self?.updateStatus() } }

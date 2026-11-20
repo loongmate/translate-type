@@ -132,14 +132,14 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
     private var auxiliaryPrevious: [ObjectIdentifier:(String,NSRange)] = [:]
     private var restoringAuxiliary = false
     private var syncingAuxiliary = false
-    private let modes = NSSegmentedControl(labels:["改文字","问 AI"],trackingMode:.selectOne,target:nil,action:nil)
+    private let modes = NSSegmentedControl(labels:["改文字","问问 AI"],trackingMode:.selectOne,target:nil,action:nil)
     private let actionPicker = NSPopUpButton()
     private let actionSearch = NSSearchField()
     private let versions = NSPopUpButton()
     private let sourceTitle = NSTextField(labelWithString:"原文")
     private let resultTitle = NSTextField(labelWithString:"结果 · 可修改")
     private let copyAnswer = NSButton()
-    private let referenceToggle = NSButton(title:"参考文字 ▸",target:nil,action:nil)
+    private let referenceToggle = WorkspaceButton("参考文字",symbol:"paperclip",target:nil,action:nil)
     private var actionTools: NSStackView!
     private var referencePane: NSView!
     private var followUpPane: NSView!
@@ -147,7 +147,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
     private var actionEditor: AIActionWindow?
     private var modeHistory: [EditorAIMode:UndoManager] = [:]
     private var lastArchive: EditorArchive?
-    private let restoreLast = NSButton()
+    private let restoreLast = WorkspaceButton("上次内容",target:nil,action:nil)
     private(set) var history = UndoManager()
     private let candidatePanel = CandidatePanel()
     private let count = NSTextField(labelWithString:"")
@@ -155,20 +155,42 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
     private let destinationLabel = NSTextField(wrappingLabelWithString:"")
     let transcript = ChatTranscriptView(frame:.zero)
     private let chatTools = NSStackView()
-    private let newChat = NSButton()
-    private let continueChat = NSButton()
-    private let copyChat = NSButton()
-    private let directoryButton = NSButton()
+    private let newChat = WorkspaceButton("新对话",symbol:"square.and.pencil",target:nil,action:nil,kind:.soft)
+    private let continueChat = WorkspaceButton("继续",target:nil,action:nil)
+    private let copyChat = WorkspaceButton("复制回答",symbol:"doc.on.doc",target:nil,action:nil)
+    private let directoryButton = WorkspaceButton("工作目录",symbol:"folder",target:nil,action:nil)
+    private var chatSidebar: NSView!
+    private let conversationList = WorkspaceStyle.column(spacing:5)
+    private let conversationScroll = NSScrollView()
+    private let chatTitle = WorkspaceStyle.label("新对话",size:12,weight:.medium,color:WorkspaceStyle.ink)
+    private var transformTools: NSView!
+    private var sourceHeading: NSView!
+    private var chatHeader: NSView!
+    private var mainWidth: NSLayoutConstraint!
+    private var sourceCardHeight: NSLayoutConstraint!
+    private let workspaceTitle = WorkspaceStyle.label("改文字",size:13,weight:.semibold,color:WorkspaceStyle.ink)
+    private var switchingConversation = false
+    private var currentConversationID = UUID()
+    private struct Conversation {
+        var id: UUID
+        var messages: [AgentMessage]
+        var directory: String
+        var provider: ModelConfiguration?
+        var draft: String
+        var reference: String
+        var title: String { String((messages.first(where:{$0.role == "user"})?.content ?? draft).split(separator:"\n").first.map(String.init)?.prefix(20) ?? "新对话") }
+    }
+    private var conversations: [Conversation] = []
     private var sourceHeight: NSLayoutConstraint!
     private var panes: NSStackView!
     private var resultPane: NSView!
-    private let language = NSButton()
+    private let language = WorkspaceButton("中 ⇧",target:nil,action:nil)
     private let style = NSPopUpButton()
-    private let translate = NSButton()
-    private let insertSource = NSButton()
-    private let insertResult = NSButton()
-    private let cancel = NSButton()
-    private let recover = NSButton()
+    private let translate = WorkspaceButton("发送 ⌃↵",symbol:"arrow.up",target:nil,action:nil,kind:.primary)
+    private let insertSource = WorkspaceButton("原文上屏",target:nil,action:nil)
+    private let insertResult = WorkspaceButton("插入回答",symbol:"arrow.turn.down.left",target:nil,action:nil,kind:.soft)
+    private let cancel = WorkspaceButton("停止",symbol:"stop",target:nil,action:nil,kind:.soft)
+    private let recover = WorkspaceButton("重新绑定光标",target:nil,action:nil)
     private var previousDraft = ""
     private var previousSelection = NSRange(location:0,length:0)
     private var rendering = false
@@ -274,6 +296,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         settleOpening()
     }
     private func prepareSession(_ state:CompositionSession) {
+        currentConversationID = UUID()
         session = state; previousUpdate = state.onUpdate
         state.onUpdate = { [weak self] in self?.refresh() }
         state.agent.onUpdate = { [weak self] in self?.refresh() }
@@ -417,6 +440,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
                 self.show(); return
             }
             EditorDiagnostics.record("commit-dispatched",destination.diagnosticState().merging(["panelVisible":self.isVisible,"panelKey":self.window.isKeyWindow]) { _,new in new })
+            if session.editorMode == .ask { self.rememberConversation() }
             self.lastArchive = session.editorArchive
             session.onUpdate = nil; session.finishEditor(); session.onUpdate = self.previousUpdate
             self.session = nil; self.destination = nil; self.currentHost = nil; self.resumeAction = nil; self.previousUpdate = nil; self.history.removeAllActions()
@@ -477,8 +501,8 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
             EditorDiagnostics.record("target-status",["problem":problem ?? "","hostHasMoved":hostHasMoved,"target":destination?.diagnosticState() ?? [:]])
         }
         destinationLabel.stringValue = problem ?? "目标：\(destination?.name ?? "原输入框") · ⌘Enter 上屏"
-        destinationLabel.textColor = problem == nil ? .secondaryLabelColor : .systemOrange
-        recover.isHidden = problem == nil
+        destinationLabel.textColor = problem == nil || destination == nil ? WorkspaceStyle.muted : .systemOrange
+        recover.isHidden = problem == nil || currentHost == nil
         let observedApp = currentHost.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier:$0.client.bundleIdentifier() ?? "").first }
         let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         recover.title = observedApp != nil && frontPID != observedApp?.processIdentifier && frontPID != ProcessInfo.processInfo.processIdentifier ? "返回目标应用" : "重新绑定光标"
@@ -497,7 +521,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         if s.editorMode == .transform && result.selectedRange().length > 0 { count.stringValue = "已选 \((selectedResult ?? "").count) 字 · ⌘Enter 只插入选中部分" }
     }
     func refresh() {
-        guard let s = session, window != nil else { return }
+        guard let s = session, window != nil, !switchingConversation else { return }
         rendering = true
         if previousDraft != s.draft {
             if !restoring {
@@ -511,7 +535,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         let changed = source.string != s.markedText
         if changed {
             source.string = s.markedText
-            source.textStorage?.setAttributes([.font:NSFont.systemFont(ofSize:16),.foregroundColor:NSColor.labelColor,.paragraphStyle:Self.paragraphStyle],range:NSRange(location:0,length:source.string.utf16.count))
+            source.textStorage?.setAttributes([.font:NSFont.systemFont(ofSize:15),.foregroundColor:WorkspaceStyle.ink,.paragraphStyle:Self.paragraphStyle],range:NSRange(location:0,length:source.string.utf16.count))
         }
         if s.hasPendingInput {
             let range = NSRange(location:s.pendingTextStart,length:s.snapshot.preedit.utf16.count)
@@ -557,6 +581,14 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         status.stringValue = s.draft.count > TranslationClient.maximumCharacters ? "单次输入最多 20,000 字，草稿完整保留。" : hasPendingInput ? "空格确认候选；完成选词后才能执行或上屏。" : s.isTranslating ? "正在处理… 可随时停止，输入内容仍保留。" : s.errorMessage ?? message ?? (s.translation == nil && s.displayedAnswer != nil ? "输入或动作已变化，右侧为旧结果；重新执行后才能上屏。" : s.editorMode == .ask ? "⌃Enter 提问；在追问框中继续问。可修改回答、选择一部分再 ⌘Enter 上屏。" : "⌃Enter 执行动作；⌘Enter 上屏结果，⇧⌘Enter 上屏原文。不会发送消息。")
         status.textColor = s.errorMessage != nil ? .systemOrange : .secondaryLabelColor
         let asking = s.editorMode == .ask
+        source.placeholder = asking ? "说说你想做什么，剩下的交给方寸…" : "在这里写下或粘贴想处理的文字…"
+        window.title = asking ? "方寸 · 问问 AI" : "方寸 · 改文字"
+        workspaceTitle.stringValue = asking ? "问问 AI" : "改文字"
+        chatSidebar.isHidden = !asking; chatHeader.isHidden = !asking
+        mainWidth.constant = asking ? -185 : 0
+        sourceCardHeight.isActive = !asking
+        transformTools.isHidden = asking; sourceHeading.isHidden = asking
+        count.isHidden = asking
         transcript.isHidden = !asking; chatTools.isHidden = !asking
         sourceHeight.constant = asking ? 75 : 130
         if asking {
@@ -570,11 +602,12 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
             newChat.isEnabled = !hasPendingInput
             continueChat.isHidden = s.agent.error == nil; continueChat.isEnabled = !s.agent.isRunning && !hasPendingInput
             copyChat.isEnabled = !s.agent.isRunning && s.agent.latestAnswer != nil
-            directoryButton.title = "工作目录：" + (s.agent.directory as NSString).lastPathComponent
+            directoryButton.title = (s.agent.directory as NSString).lastPathComponent
             directoryButton.toolTip = s.agent.directory; directoryButton.isEnabled = !s.agent.isRunning
             status.stringValue = hasPendingInput ? "请先完成选词，再发送消息。" : message ?? s.agent.status
             status.textColor = s.agent.error == nil ? .secondaryLabelColor : .systemOrange
             count.stringValue = "\(s.draft.count) 字 · \(s.agent.messages.filter { $0.role == "user" }.count) 轮对话 · ⌘Enter 插入所选回答或最新回答"
+            updateConversationList()
         }
         rendering = false
         refreshDestination(); refreshCandidates()
@@ -635,7 +668,7 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         let wasRendering = rendering; rendering = true
         if view.string != state.markedText {
             view.string = state.markedText
-            view.textStorage?.setAttributes([.font:NSFont.systemFont(ofSize:16),.foregroundColor:NSColor.labelColor,.paragraphStyle:Self.paragraphStyle],range:NSRange(location:0,length:view.string.utf16.count))
+            view.textStorage?.setAttributes([.font:NSFont.systemFont(ofSize:15),.foregroundColor:WorkspaceStyle.ink,.paragraphStyle:Self.paragraphStyle],range:NSRange(location:0,length:view.string.utf16.count))
         }
         if state.hasPendingInput {
             view.textStorage?.addAttribute(.underlineStyle,value:NSUnderlineStyle.single.rawValue,range:NSRange(location:state.pendingTextStart,length:state.snapshot.preedit.utf16.count))
@@ -662,8 +695,53 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
     }
     @objc private func stopTranslation() { session?.stopEditorRequest() }
     @objc func startNewConversation() {
-        guard !hasPendingInput else { informPending(); return }
-        session?.agent.reset(); message = nil; refresh()
+        guard !hasPendingInput, let s = session else { informPending(); return }
+        switchingConversation = true; s.agent.stop(); rememberConversation()
+        currentConversationID = UUID(); s.agent.reset(); s.setEditorReference("")
+        s.replaceEditorText("",selection:NSRange(location:0,length:0))
+        referenceToggle.state = .off; history.removeAllActions(); auxiliaryHistory.values.forEach { $0.removeAllActions() }
+        previousDraft = ""; previousSelection = NSRange(location:0,length:0)
+        switchingConversation = false; message = nil; transcript.resetConversation(); refresh(); window.makeFirstResponder(source)
+    }
+    private func conversationSnapshot() -> Conversation? {
+        guard let s = session else { return nil }
+        return Conversation(id:currentConversationID,messages:s.agent.messages,directory:s.agent.directory,provider:s.agent.provider,draft:s.draft,reference:s.editorReference)
+    }
+    private func rememberConversation() {
+        guard let snapshot = conversationSnapshot(), !snapshot.messages.isEmpty || !snapshot.draft.isEmpty || !snapshot.reference.isEmpty else { return }
+        conversations.removeAll { $0.id == snapshot.id }; conversations.insert(snapshot,at:0)
+        if conversations.count > 7 { conversations.removeLast(conversations.count-7) }
+    }
+    private var conversationListSignature = ""
+    private func updateConversationList() {
+        guard let current = conversationSnapshot() else { return }
+        let values = [current]+conversations.filter { $0.id != current.id }
+        chatTitle.stringValue = current.title.isEmpty ? "新对话" : current.title
+        let signature = values.map { $0.id.uuidString+$0.title }.joined(separator:"|")+String(hasPendingInput)
+        guard signature != conversationListSignature else { return }; conversationListSignature = signature
+        for view in conversationList.arrangedSubviews { conversationList.removeArrangedSubview(view); view.removeFromSuperview() }
+        for item in values {
+            let button = WorkspaceButton(item.title.isEmpty ? "新对话" : item.title,symbol:"bubble.left",target:self,action:#selector(selectConversation(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier(item.id.uuidString); button.state = item.id == current.id ? .on : .off
+            button.isEnabled = !hasPendingInput; button.alignment = .left; button.toolTip = item.title
+            (button.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
+            WorkspaceStyle.fillWidth(button,in:conversationList)
+        }
+        conversationScroll.documentView?.setFrameSize(NSSize(width:max(1,conversationScroll.contentSize.width),height:CGFloat(values.count*35-5)))
+    }
+    @objc private func selectConversation(_ sender:NSButton) {
+        guard let raw = sender.identifier?.rawValue, let id = UUID(uuidString:raw) else { return }
+        switchConversation(id)
+    }
+    func switchConversation(_ id:UUID) {
+        guard !hasPendingInput, let s = session, id != currentConversationID, let target = conversations.first(where:{$0.id == id}) else { return }
+        switchingConversation = true; s.agent.stop(); rememberConversation(); conversations.removeAll { $0.id == id }
+        currentConversationID = target.id; s.agent.restore(target.messages,directory:target.directory,provider:target.provider)
+        s.setEditorReference(target.reference); s.replaceEditorText(target.draft,selection:NSRange(location:target.draft.utf16.count,length:0))
+        referenceToggle.state = target.reference.isEmpty ? .off : .on
+        history.removeAllActions(); auxiliaryHistory.values.forEach { $0.removeAllActions() }
+        previousDraft = target.draft; previousSelection = s.draftSelection
+        switchingConversation = false; message = nil; transcript.resetConversation(); refresh(); window.makeFirstResponder(source)
     }
     @objc func continueConversation() {
         guard !hasPendingInput, let s = session else { return }
@@ -850,108 +928,146 @@ final class DraftEditor: NSObject, NSWindowDelegate, NSTextViewDelegate, DraftTe
         return s.hasPendingInput
     }
     private static var paragraphStyle: NSParagraphStyle { let style = NSMutableParagraphStyle(); style.lineSpacing = 6; return style }
+    @objc private func toggleWorkspaceAppearance() { WorkspaceStyle.toggleAppearance(for:window) }
+    @objc private func workspaceAppearanceChanged() { window.appearance = WorkspaceStyle.appearance; refresh() }
+    @objc private func zoomWorkspace() { window.zoom(nil) }
+    @objc private func useSuggestion(_ sender:NSButton) {
+        guard !hasPendingInput, let s = session else { informPending(); return }
+        let prompts = ["整理成待办":"帮我把下面的想法整理成一份行动清单：\n", "帮我写回复":"帮我写一封自然、简洁的回复：\n", "解释代码":"请解释下面代码的思路、输入输出和注意事项：\n"]
+        let text = prompts[sender.title] ?? sender.title
+        s.replaceEditorText(text,selection:NSRange(location:text.utf16.count,length:0)); window.makeFirstResponder(source)
+    }
     private func build() {
-        window = DraftEditorPanel(contentRect:NSRect(x:0,y:0,width:980,height:690),styleMask:[.titled,.closable,.resizable,.nonactivatingPanel],backing:.buffered,defer:false)
-        window.owner = self; window.delegate = self; window.title = "方寸 · 临时编辑区"
+        window = DraftEditorPanel(contentRect:NSRect(x:0,y:0,width:1060,height:720),styleMask:[.titled,.closable,.resizable,.nonactivatingPanel],backing:.buffered,defer:false)
+        window.owner = self; window.delegate = self; window.title = "方寸 · 问问 AI"
         window.isReleasedWhenClosed = false; window.isFloatingPanel = true; window.hidesOnDeactivate = false
-        window.becomesKeyOnlyIfNeeded = false; window.level = .floating
+        window.becomesKeyOnlyIfNeeded = false; window.level = .floating; window.titlebarAppearsTransparent = true
         window.collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]
-        window.minSize = NSSize(width:820,height:600); window.appearance = NSAppearance(named:.aqua)
-        window.setFrameAutosaveName("FangCunDraftEditor"); window.center()
+        window.minSize = NSSize(width:820,height:600); window.appearance = WorkspaceStyle.appearance
+        window.backgroundColor = WorkspaceStyle.soft; window.setFrameAutosaveName("FangCunDraftEditor"); window.center()
         NotificationCenter.default.addObserver(self,selector:#selector(configurationChanged),name:.modelConfigurationChanged,object:nil)
         NotificationCenter.default.addObserver(self,selector:#selector(actionsChanged),name:.aiActionsChanged,object:ConfigurationStore.shared)
         NotificationCenter.default.addObserver(self,selector:#selector(layoutChanged),name:.pinyinLayoutChanged,object:nil)
+        NotificationCenter.default.addObserver(self,selector:#selector(workspaceAppearanceChanged),name:WorkspaceStyle.themeChanged,object:nil)
         history.levelsOfUndo = 100
-        window.backgroundColor = NSColor(calibratedRed:0.98,green:0.97,blue:0.99,alpha:1)
-        let root = NSStackView(); root.orientation = .vertical; root.alignment = .leading; root.spacing = 12; root.edgeInsets = NSEdgeInsets(top:14,left:18,bottom:14,right:18)
-        root.translatesAutoresizingMaskIntoConstraints = false; window.contentView!.addSubview(root)
-        NSLayoutConstraint.activate([root.leadingAnchor.constraint(equalTo:window.contentView!.leadingAnchor),root.trailingAnchor.constraint(equalTo:window.contentView!.trailingAnchor),root.topAnchor.constraint(equalTo:window.contentView!.topAnchor),root.bottomAnchor.constraint(equalTo:window.contentView!.bottomAnchor)])
-        func full(_ v:NSView) { root.addArrangedSubview(v); v.widthAnchor.constraint(equalTo:root.widthAnchor,constant:-36).isActive = true }
-        func row() -> NSStackView { let r = NSStackView(); r.orientation = .horizontal; r.spacing = 8; return r }
-        func button(_ b:NSButton,_ title:String,_ action:Selector) { b.title = title; b.target = self; b.action = action; b.bezelStyle = .rounded; b.font = .systemFont(ofSize:12) }
-        func makeButton(_ title:String,_ action:Selector)->NSButton { let b = NSButton(); button(b,title,action); return b }
-        func spacer()->NSView { let v = NSView(); v.setContentHuggingPriority(.defaultLow,for:.horizontal); return v }
-        let modeRow = row()
-        modes.target = self; modes.action = #selector(changeMode); modes.selectedSegment = 0
-        modeRow.addArrangedSubview(modes)
-        button(restoreLast,"上次内容",#selector(restoreLastContent)); modeRow.addArrangedSubview(restoreLast); modeRow.addArrangedSubview(spacer())
-        referenceToggle.target = self; referenceToggle.action = #selector(toggleReference); referenceToggle.setButtonType(.pushOnPushOff); referenceToggle.bezelStyle = .rounded; referenceToggle.toolTip = "展开或收起参考文字；已填写的资料会随问题发送，清空则不发送"; modeRow.addArrangedSubview(referenceToggle)
-        full(modeRow)
-        actionTools = row(); actionPicker.target = self; actionPicker.action = #selector(changeAction)
-        actionPicker.toolTip = "选择动作；/key 为菜单中的检索别名，保存和切换不会调用 AI"
-        actionPicker.widthAnchor.constraint(lessThanOrEqualToConstant:280).isActive = true
+        let backdrop = WorkspaceSurface(); window.contentView = backdrop
+        let root = WorkspaceStyle.column(); backdrop.addSubview(root); WorkspaceStyle.pin(root,to:backdrop)
+        func full(_ view:NSView,in parent:NSStackView) { WorkspaceStyle.fillWidth(view,in:parent,inset:parent.edgeInsets.left+parent.edgeInsets.right) }
+        func row() -> NSStackView { WorkspaceStyle.row() }
+        func button(_ b:NSButton,_ title:String,_ action:Selector) { b.title = title; b.target = self; b.action = action; b.font = .systemFont(ofSize:12) }
+        func makeButton(_ title:String,_ action:Selector,_ symbol:String? = nil) -> WorkspaceButton { WorkspaceButton(title,symbol:symbol,target:self,action:action) }
+        func separator(in stack:NSStackView) { let line = NSBox(); line.boxType = .separator; full(line,in:stack) }
+        let header = row(); header.edgeInsets = NSEdgeInsets(top:9,left:22,bottom:9,right:18)
+        let mark = NSImageView(image:WorkspaceStyle.symbol("command")!); mark.contentTintColor = WorkspaceStyle.accent
+        header.addArrangedSubview(mark); header.addArrangedSubview(workspaceTitle); header.addArrangedSubview(WorkspaceStyle.label("方寸",size:11,color:WorkspaceStyle.subtle)); header.addArrangedSubview(WorkspaceStyle.spacer())
+        modes.target = self; modes.action = #selector(changeMode); modes.selectedSegment = 0; modes.segmentStyle = .rounded; modes.font = .systemFont(ofSize:11)
+        modes.selectedSegmentBezelColor = WorkspaceStyle.accent
+        header.addArrangedSubview(modes)
+        button(restoreLast,"上次内容",#selector(restoreLastContent)); header.addArrangedSubview(restoreLast)
+        let theme = makeButton("",#selector(toggleWorkspaceAppearance),"moon"); theme.toolTip = "切换浅色或深色外观"; theme.setAccessibilityLabel("切换浅色或深色外观"); header.addArrangedSubview(theme)
+        let settingsButton = makeButton("",#selector(settings),"slider.horizontal.3"); settingsButton.setAccessibilityLabel("模型设置"); settingsButton.toolTip = "模型设置"; header.addArrangedSubview(settingsButton)
+        let zoom = makeButton("",#selector(zoomWorkspace),"arrow.up.left.and.arrow.down.right"); zoom.setAccessibilityLabel("放大窗口"); header.addArrangedSubview(zoom)
+        header.heightAnchor.constraint(equalToConstant:48).isActive = true
+        full(header,in:root); separator(in:root)
+        let body = row(); body.spacing = 1; body.alignment = .top
+        let sidebar = WorkspaceSurface(WorkspaceStyle.sidebar); chatSidebar = sidebar; sidebar.widthAnchor.constraint(equalToConstant:184).isActive = true
+        let side = WorkspaceStyle.column(spacing:8); side.edgeInsets = NSEdgeInsets(top:18,left:12,bottom:16,right:12)
+        sidebar.addSubview(side); WorkspaceStyle.pin(side,to:sidebar)
+        button(newChat,"新对话",#selector(startNewConversation)); full(newChat,in:side)
+        let recent = WorkspaceStyle.label("本次使用",size:10,color:WorkspaceStyle.subtle); full(recent,in:side)
+        side.setCustomSpacing(18,after:newChat)
+        conversationScroll.hasVerticalScroller = true; conversationScroll.autohidesScrollers = true; conversationScroll.borderType = .noBorder; conversationScroll.drawsBackground = false
+        conversationScroll.setContentHuggingPriority(.defaultLow,for:.vertical)
+        conversationScroll.heightAnchor.constraint(greaterThanOrEqualToConstant:90).isActive = true
+        let historyDocument = WorkspaceFlippedView(frame:NSRect(x:0,y:0,width:160,height:30)); historyDocument.autoresizingMask = [.width]
+        conversationScroll.documentView = historyDocument; historyDocument.addSubview(conversationList); WorkspaceStyle.pin(conversationList,to:historyDocument)
+        full(conversationScroll,in:side)
+        separator(in:side); full(WorkspaceStyle.label("工作目录",size:10,color:WorkspaceStyle.subtle),in:side)
+        button(directoryButton,"工作目录",#selector(chooseDirectory)); directoryButton.alignment = .left
+        (directoryButton.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingMiddle
+        full(directoryButton,in:side); full(WorkspaceStyle.label("文件与命令从这里开始",size:10,color:WorkspaceStyle.subtle),in:side)
+        body.addArrangedSubview(sidebar)
+        let main = WorkspaceStyle.column(); body.addArrangedSubview(main)
+        mainWidth = main.widthAnchor.constraint(equalTo:body.widthAnchor); mainWidth.isActive = true
+        sidebar.heightAnchor.constraint(equalTo:body.heightAnchor).isActive = true; main.heightAnchor.constraint(equalTo:body.heightAnchor).isActive = true
+        let chatTop = row(); chatTop.heightAnchor.constraint(equalToConstant:54).isActive = true; chatTop.edgeInsets = NSEdgeInsets(top:12,left:24,bottom:12,right:20); chatHeader = chatTop
+        chatTop.addArrangedSubview(chatTitle); chatTop.addArrangedSubview(WorkspaceStyle.label("问问 AI",size:10,color:WorkspaceStyle.subtle)); chatTop.addArrangedSubview(WorkspaceStyle.spacer())
+        button(continueChat,"继续",#selector(continueConversation)); chatTop.addArrangedSubview(continueChat)
+        button(copyChat,"复制回答",#selector(copyResult)); chatTop.addArrangedSubview(copyChat); full(chatTop,in:main)
+        actionTools = row(); actionTools.heightAnchor.constraint(equalToConstant:48).isActive = true; actionTools.edgeInsets = NSEdgeInsets(top:10,left:20,bottom:6,right:20)
+        actionPicker.target = self; actionPicker.action = #selector(changeAction); actionPicker.widthAnchor.constraint(lessThanOrEqualToConstant:260).isActive = true
+        actionPicker.toolTip = "选择动作；保存和切换不会调用 AI"
         actionSearch.placeholderString = "搜索动作或 /key"; actionSearch.target = self; actionSearch.action = #selector(searchActions); actionSearch.sendsSearchStringImmediately = true
-        actionSearch.widthAnchor.constraint(equalToConstant:150).isActive = true; actionTools.addArrangedSubview(actionSearch)
-        actionTools.addArrangedSubview(actionPicker); actionTools.addArrangedSubview(makeButton("编辑指令",#selector(editAction)))
-        actionTools.addArrangedSubview(makeButton("＋ 自定义",#selector(newAction))); actionTools.addArrangedSubview(spacer()); full(actionTools)
-        let tools = row()
-        tools.addArrangedSubview(makeButton("粘贴",#selector(pasteDraft))); tools.addArrangedSubview(makeButton("清空",#selector(clearDraft))); tools.addArrangedSubview(makeButton("撤销",#selector(undoDraft))); tools.addArrangedSubview(spacer())
-        button(language,"中 ⇧",#selector(changeLanguage)); tools.addArrangedSubview(language)
+        actionSearch.widthAnchor.constraint(equalToConstant:150).isActive = true; actionTools.addArrangedSubview(actionSearch); actionTools.addArrangedSubview(actionPicker)
+        actionTools.addArrangedSubview(makeButton("编辑指令",#selector(editAction))); actionTools.addArrangedSubview(makeButton("自定义",#selector(newAction),"plus")); actionTools.addArrangedSubview(WorkspaceStyle.spacer()); full(actionTools,in:main)
+        let tools = row(); tools.heightAnchor.constraint(equalToConstant:38).isActive = true; tools.edgeInsets = NSEdgeInsets(top:0,left:20,bottom:6,right:20); transformTools = tools
+        tools.addArrangedSubview(makeButton("粘贴",#selector(pasteDraft),"doc.on.clipboard")); tools.addArrangedSubview(makeButton("清空",#selector(clearDraft))); tools.addArrangedSubview(makeButton("撤销",#selector(undoDraft),"arrow.uturn.backward")); tools.addArrangedSubview(WorkspaceStyle.spacer())
         style.addItems(withTitles:["使用已配置的指令"]+ModelConfiguration.presets.map(\.0)); style.target = self; style.action = #selector(changeStyle); style.toolTip = "本段翻译风格；不会自动请求模型"; tools.addArrangedSubview(style)
-        tools.addArrangedSubview(makeButton("设置",#selector(settings)))
-        let collapse = makeButton("缩小 ↙",#selector(collapse)); collapse.toolTip = "缩回候选窗（Esc），保留草稿"; tools.addArrangedSubview(collapse); full(tools)
-        panes = row(); panes.alignment = .top; panes.distribution = .fillEqually
-        func pane(_ title:String,_ text:DraftTextView,_ action:Selector,minimum:CGFloat = 130)->NSStackView {
-            let box = NSStackView(); box.orientation = .vertical; box.alignment = .leading; box.spacing = 8
-            let heading = row()
-            let label = text === source ? sourceTitle : text === result ? resultTitle : NSTextField(labelWithString:title)
-            label.font = .systemFont(ofSize:12,weight:.medium); heading.addArrangedSubview(label); heading.addArrangedSubview(spacer())
-            if text === result {
-                versions.target = self; versions.action = #selector(changeVersion); versions.widthAnchor.constraint(lessThanOrEqualToConstant:170).isActive = true
-                heading.addArrangedSubview(versions); button(copyAnswer,"复制",action); heading.addArrangedSubview(copyAnswer)
-            } else if text === source { heading.addArrangedSubview(makeButton("复制",action)) }
-            box.addArrangedSubview(heading)
-            let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.borderType = .noBorder; scroll.wantsLayer = true; scroll.layer?.cornerRadius = 8; scroll.layer?.borderWidth = 1; scroll.layer?.borderColor = NSColor(calibratedWhite:0.87,alpha:1).cgColor
+        tools.addArrangedSubview(makeButton("缩小",#selector(collapse),"arrow.down.right.and.arrow.up.left")); full(tools,in:main)
+        panes = row(); panes.alignment = .top; panes.distribution = .fillEqually; panes.spacing = 18; panes.edgeInsets = NSEdgeInsets(top:0,left:22,bottom:8,right:22)
+        func scroll(_ text:DraftTextView) -> NSScrollView {
+            let view = NSScrollView(); view.hasVerticalScroller = true; view.autohidesScrollers = true; view.borderType = .noBorder; view.drawsBackground = false
             text.owner = self; text.delegate = self; text.isRichText = false; text.isAutomaticQuoteSubstitutionEnabled = false; text.isAutomaticDashSubstitutionEnabled = false; text.isAutomaticTextReplacementEnabled = false; text.isAutomaticSpellingCorrectionEnabled = false
-            text.defaultParagraphStyle = Self.paragraphStyle; text.backgroundColor = text === result ? NSColor(calibratedRed:0.985,green:0.975,blue:1,alpha:1) : .white
-            text.allowsUndo = false; text.font = .systemFont(ofSize:16); text.textContainerInset = NSSize(width:14,height:12)
-            text.minSize = NSSize(width:0,height:0); text.maxSize = NSSize(width:CGFloat.greatestFiniteMagnitude,height:CGFloat.greatestFiniteMagnitude)
+            text.defaultParagraphStyle = Self.paragraphStyle; text.backgroundColor = WorkspaceStyle.surface; text.textColor = WorkspaceStyle.ink; text.insertionPointColor = WorkspaceStyle.accent
+            text.selectedTextAttributes = [.backgroundColor:WorkspaceStyle.tint,.foregroundColor:WorkspaceStyle.ink]
+            text.allowsUndo = false; text.font = .systemFont(ofSize:15); text.textContainerInset = NSSize(width:10,height:12)
+            text.minSize = .zero; text.maxSize = NSSize(width:CGFloat.greatestFiniteMagnitude,height:CGFloat.greatestFiniteMagnitude)
             text.isVerticallyResizable = true; text.isHorizontallyResizable = false; text.autoresizingMask = [.width]; text.textContainer?.widthTracksTextView = true
-            text.setAccessibilityLabel(title); scroll.documentView = text
-            box.addArrangedSubview(scroll)
-            if text === source {
-                sourceHeight = scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:minimum)
-                sourceHeight.isActive = true
-                let preferred = scroll.heightAnchor.constraint(equalToConstant:90); preferred.priority = .defaultHigh; preferred.isActive = true
-            }
-            NSLayoutConstraint.activate([heading.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.widthAnchor.constraint(equalTo:box.widthAnchor),scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:text === source ? 0 : minimum)])
+            view.setContentHuggingPriority(.defaultLow,for:.vertical); view.documentView = text; return view
+        }
+        func pane(_ title:String,_ text:DraftTextView,minimum:CGFloat) -> NSStackView {
+            let box = WorkspaceStyle.column(spacing:5)
+            let label = text === result ? resultTitle : WorkspaceStyle.label(title,size:11)
+            label.font = .systemFont(ofSize:11,weight:.medium); label.textColor = WorkspaceStyle.muted
+            full(label,in:box); let scroller = scroll(text); text.setAccessibilityLabel(title); full(scroller,in:box)
+            scroller.heightAnchor.constraint(greaterThanOrEqualToConstant:minimum).isActive = true
             return box
         }
-        let sourcePane = pane("原文",source,#selector(copySource))
-        sourcePane.insertArrangedSubview(transcript,at:0)
-        transcript.widthAnchor.constraint(equalTo:sourcePane.widthAnchor).isActive = true
-        transcript.heightAnchor.constraint(greaterThanOrEqualToConstant:170).isActive = true
-        chatTools.orientation = .horizontal; chatTools.spacing = 8
-        button(newChat,"新建对话",#selector(startNewConversation)); chatTools.addArrangedSubview(newChat)
-        button(continueChat,"继续",#selector(continueConversation)); chatTools.addArrangedSubview(continueChat)
-        button(copyChat,"复制回答",#selector(copyResult)); chatTools.addArrangedSubview(copyChat)
-        chatTools.addArrangedSubview(spacer())
-        button(directoryButton,"工作目录",#selector(chooseDirectory)); chatTools.addArrangedSubview(directoryButton)
-        directoryButton.widthAnchor.constraint(lessThanOrEqualToConstant:280).isActive = true
-        (directoryButton.cell as? NSButtonCell)?.lineBreakMode = .byTruncatingMiddle
-        sourcePane.insertArrangedSubview(chatTools,at:1)
-        chatTools.widthAnchor.constraint(equalTo:sourcePane.widthAnchor).isActive = true
-        let resultBox = pane("结果 · 可修改",result,#selector(copyResult)); resultPane = resultBox
-        referencePane = pane("参考文字 · 可选，只作为本次资料",reference,#selector(copySource),minimum:60)
-        sourcePane.addArrangedSubview(referencePane)
-        referencePane.widthAnchor.constraint(equalTo:sourcePane.widthAnchor).isActive = true
-        referencePane.heightAnchor.constraint(equalToConstant:108).isActive = true
-        let followBox = pane("继续追问 · ⌃Enter 发送",followUp,#selector(copySource),minimum:45)
-        let followRow = row(); followRow.addArrangedSubview(spacer()); button(sendFollowUp,"追问 ⌃↵",#selector(requestFollowUp)); followRow.addArrangedSubview(sendFollowUp)
-        followBox.addArrangedSubview(followRow); followRow.widthAnchor.constraint(equalTo:followBox.widthAnchor).isActive = true
-        followUpPane = followBox; resultBox.addArrangedSubview(followBox)
-        followBox.widthAnchor.constraint(equalTo:resultBox.widthAnchor).isActive = true
-        followBox.heightAnchor.constraint(equalToConstant:120).isActive = true
-        panes.addArrangedSubview(sourcePane); panes.addArrangedSubview(resultBox); full(panes)
-        sourcePane.heightAnchor.constraint(equalTo:panes.heightAnchor).isActive = true; resultBox.heightAnchor.constraint(equalTo:panes.heightAnchor).isActive = true
-        count.font = .systemFont(ofSize:11); count.textColor = .secondaryLabelColor; full(count)
-        status.font = .systemFont(ofSize:12); status.setContentCompressionResistancePriority(.required,for:.vertical); full(status)
-        let line = NSBox(); line.boxType = .separator; full(line)
-        let target = row(); destinationLabel.font = .systemFont(ofSize:11); target.addArrangedSubview(destinationLabel); button(recover,"确认当前光标",#selector(recoverDestination)); target.addArrangedSubview(recover); target.addArrangedSubview(spacer()); full(target)
-        let actions = row(); actions.addArrangedSubview(spacer())
-        button(insertSource,"原文上屏",#selector(commitSource)); button(translate,"翻译整段 ⌃↵",#selector(requestTranslation)); button(cancel,"停止",#selector(stopTranslation)); button(insertResult,"英文上屏",#selector(commitResult))
-        for b in [translate,insertResult] { b.bezelColor = NSColor(calibratedRed:0.48,green:0.34,blue:0.77,alpha:1); b.contentTintColor = .white }
-        for b in [insertSource,translate,cancel,insertResult] { actions.addArrangedSubview(b) }; full(actions)
+        let sourcePane = WorkspaceStyle.column(spacing:8)
+        transcript.heightAnchor.constraint(greaterThanOrEqualToConstant:150).isActive = true
+        transcript.setContentHuggingPriority(.defaultLow,for:.vertical); full(transcript,in:sourcePane)
+        transcript.onSelectionChanged = { [weak self] in guard self?.rendering == false else { return }; self?.refreshDestination() }
+        transcript.onCopyAnswer = { [weak self] text in self?.copy(text) }
+        transcript.onInsertAnswer = { [weak self] text in guard let self, self.session?.agent.isRunning == false else { return }; self.commit(text) }
+        referenceToggle.target = self; referenceToggle.action = #selector(toggleReference); referenceToggle.setButtonType(.pushOnPushOff); referenceToggle.toolTip = "展开参考文字；内容随下一条消息发送"
+        referencePane = pane("参考文字 · 可选",reference,minimum:55); full(referencePane,in:sourcePane); referencePane.heightAnchor.constraint(equalToConstant:100).isActive = true
+        chatTools.orientation = .horizontal; chatTools.spacing = 8; chatTools.heightAnchor.constraint(equalToConstant:30).isActive = true
+        for title in ["整理成待办","帮我写回复","解释代码"] { chatTools.addArrangedSubview(makeButton(title,#selector(useSuggestion(_:)))) }
+        chatTools.addArrangedSubview(WorkspaceStyle.spacer()); full(chatTools,in:sourcePane)
+        let composer = WorkspaceSurface(WorkspaceStyle.surface,stroke:WorkspaceStyle.line,radius:10)
+        composer.setContentHuggingPriority(.defaultHigh,for:.vertical)
+        sourceCardHeight = composer.heightAnchor.constraint(equalTo:sourcePane.heightAnchor)
+        let inputStack = WorkspaceStyle.column(spacing:0); composer.addSubview(inputStack); WorkspaceStyle.pin(inputStack,to:composer,insets:NSEdgeInsets(top:2,left:8,bottom:5,right:8))
+        let heading = row(); heading.heightAnchor.constraint(equalToConstant:38).isActive = true; sourceHeading = heading; heading.edgeInsets = NSEdgeInsets(top:8,left:8,bottom:0,right:8)
+        sourceTitle.font = .systemFont(ofSize:11,weight:.medium); sourceTitle.textColor = WorkspaceStyle.muted
+        heading.addArrangedSubview(sourceTitle); heading.addArrangedSubview(WorkspaceStyle.spacer()); heading.addArrangedSubview(makeButton("复制",#selector(copySource),"doc.on.doc")); full(heading,in:inputStack)
+        let sourceScroll = scroll(source); full(sourceScroll,in:inputStack)
+        sourceHeight = sourceScroll.heightAnchor.constraint(greaterThanOrEqualToConstant:75); sourceHeight.isActive = true
+        let preferred = sourceScroll.heightAnchor.constraint(equalToConstant:88); preferred.priority = .defaultHigh; preferred.isActive = true
+        let controls = row(); controls.heightAnchor.constraint(equalToConstant:36).isActive = true; controls.edgeInsets = NSEdgeInsets(top:2,left:3,bottom:2,right:3)
+        controls.addArrangedSubview(referenceToggle); controls.addArrangedSubview(WorkspaceStyle.spacer())
+        button(language,"中 ⇧",#selector(changeLanguage)); controls.addArrangedSubview(language)
+        button(translate,"发送 ⌃↵",#selector(requestTranslation)); button(cancel,"停止",#selector(stopTranslation)); controls.addArrangedSubview(translate); controls.addArrangedSubview(cancel)
+        full(controls,in:inputStack); full(composer,in:sourcePane)
+        let resultBox = pane("结果 · 可修改",result,minimum:130); resultPane = resultBox
+        let resultTools = row(); versions.target = self; versions.action = #selector(changeVersion); versions.widthAnchor.constraint(lessThanOrEqualToConstant:160).isActive = true
+        resultTools.addArrangedSubview(versions); resultTools.addArrangedSubview(WorkspaceStyle.spacer()); button(copyAnswer,"复制",#selector(copyResult)); resultTools.addArrangedSubview(copyAnswer)
+        resultBox.insertArrangedSubview(resultTools,at:1); resultTools.widthAnchor.constraint(equalTo:resultBox.widthAnchor).isActive = true
+        let followBox = pane("继续追问 · ⌃Enter 发送",followUp,minimum:45); followUpPane = followBox
+        let followRow = row(); followRow.addArrangedSubview(WorkspaceStyle.spacer()); button(sendFollowUp,"追问 ⌃↵",#selector(requestFollowUp)); followRow.addArrangedSubview(sendFollowUp)
+        full(followRow,in:followBox); full(followBox,in:resultBox); followBox.heightAnchor.constraint(equalToConstant:120).isActive = true
+        panes.addArrangedSubview(sourcePane); panes.addArrangedSubview(resultBox); full(panes,in:main)
+        sourcePane.heightAnchor.constraint(equalTo:panes.heightAnchor,constant:-8).isActive = true; resultBox.heightAnchor.constraint(equalTo:panes.heightAnchor,constant:-8).isActive = true
+        let meta = row(); meta.heightAnchor.constraint(equalToConstant:20).isActive = true; meta.edgeInsets = NSEdgeInsets(top:0,left:25,bottom:2,right:25)
+        count.font = .systemFont(ofSize:10); count.textColor = WorkspaceStyle.muted; meta.addArrangedSubview(count); meta.addArrangedSubview(WorkspaceStyle.spacer()); full(meta,in:main)
+        status.font = .systemFont(ofSize:10); status.textColor = WorkspaceStyle.muted; status.setContentCompressionResistancePriority(.required,for:.vertical)
+        let statusRow = row(); statusRow.heightAnchor.constraint(equalToConstant:28).isActive = true; statusRow.edgeInsets = NSEdgeInsets(top:1,left:25,bottom:5,right:25); statusRow.addArrangedSubview(status); full(statusRow,in:main)
+        separator(in:main)
+        let footer = row(); footer.heightAnchor.constraint(equalToConstant:46).isActive = true; footer.edgeInsets = NSEdgeInsets(top:6,left:22,bottom:8,right:20)
+        destinationLabel.font = .systemFont(ofSize:10); destinationLabel.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
+        footer.addArrangedSubview(destinationLabel); button(recover,"重新绑定光标",#selector(recoverDestination)); footer.addArrangedSubview(recover); footer.addArrangedSubview(WorkspaceStyle.spacer())
+        button(insertSource,"原文上屏",#selector(commitSource)); button(insertResult,"插入回答 ⌘↵",#selector(commitResult)); footer.addArrangedSubview(insertSource); footer.addArrangedSubview(insertResult); full(footer,in:main)
+        full(body,in:root)
     }
     func capture(to url:URL) throws {
         window.contentView!.layoutSubtreeIfNeeded()
@@ -978,6 +1094,7 @@ final class DraftEditorPanel: NSPanel {
         if ConfigurationStore.shared.editorShortcut.matches(event) { return true }
         if flags == [.control] && [36,76].contains(event.keyCode) { owner?.requestTranslation(); return true }
         if flags.contains(.command), let key = event.charactersIgnoringModifiers?.lowercased() {
+            if key == "n", flags == [.command], owner?.session?.editorMode == .ask { owner?.startNewConversation(); return true }
             if key == "w" && flags == [.command] { owner?.hide(); return true }
             if key == "z" && (flags == [.command] || flags == [.command,.shift]) {
                 guard owner?.hasPendingInput == false else { owner?.informPending(); return true }
@@ -1004,6 +1121,13 @@ protocol DraftTextOwner: AnyObject {
 @MainActor
 final class DraftTextView: NSTextView {
     weak var owner: (any DraftTextOwner)?
+    var placeholder: String? { didSet { if oldValue != placeholder { needsDisplay = true } } }
+    override func draw(_ dirtyRect:NSRect) {
+        super.draw(dirtyRect)
+        if string.isEmpty, let placeholder {
+            (placeholder as NSString).draw(at:textContainerOrigin,withAttributes:[.font:font ?? NSFont.systemFont(ofSize:15),.foregroundColor:WorkspaceStyle.subtle])
+        }
+    }
     // Feed the shared Rime session directly; never recursively start our IMK
     // server for its own editor. AppKit still supplies editing/selection/clipboard.
     override var inputContext: NSTextInputContext? { nil }

@@ -92,6 +92,10 @@ struct CoreTests {
                     type(helloCodes[layout]!)
                     let preview = literal.snapshot.preview
                     literal.handle(key:key,shift:key == 58)
+                    if key == 46 {
+                        check(result() == expected && literal.snapshot.preedit == preview+mark && literal.hasPendingInput,"\(label)：未选拼音后的句号先留在预编辑")
+                        literal.handle(key:32)
+                    }
                     expected += preview+mark
                     check(result() == expected && !literal.hasPendingInput,"\(label)：拼音后直接按标点确认中文，不退回字母")
                 }

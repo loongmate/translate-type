@@ -88,6 +88,18 @@ import InputMethodKit
             let event = NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:flags,timestamp:stamp,windowNumber:e.window.windowNumber,context:nil,characters:text,charactersIgnoringModifiers:text,isARepeat:false,keyCode:code)!
             e.window.makeFirstResponder(view); view.keyDown(with:event)
         }
+        ui.replaceEditorText("头旧尾",selection:NSRange(location:1,length:1))
+        for c in "baidu.com/path" { key(String(c),in:e.source) }
+        check(e.source.string == "头baidu.com/path尾" && ui.draft == "头旧尾" && ui.hasPendingInput,"原生编辑区在选区显示裸域名和半角路径")
+        key(" ",49,in:e.source)
+        check(ui.draft == "头baidu.com/path尾" && !ui.hasPendingInput,"确认域名只替换原选区")
+        ui.replaceEditorText("头旧尾",selection:NSRange(location:1,length:1))
+        for c in "nihao" { key(String(c),in:e.source) }
+        key(".",47,in:e.source)
+        check(e.source.string == "头你好。尾" && ui.draft == "头旧尾" && ui.hasPendingInput,"原生编辑区立即显示待定中文句号")
+        key("\r",36,in:e.source)
+        check(ui.draft == "头你好。尾" && !ui.hasPendingInput,"回车确认中文句号且保留选区两侧")
+        ui.replaceEditorText("",selection:NSRange(location:0,length:0))
         e.selectMode(.ask)
         ui.replaceEditorText("写一句邀请",selection:NSRange(location:5,length:0))
         for c in "nihao" { key(String(c),in:e.reference) }

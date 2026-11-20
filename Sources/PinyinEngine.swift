@@ -19,6 +19,9 @@ final class PinyinEngine {
     private var literalInput: String?
     private var literalCaret = 0
     var isLiteralInput: Bool { literalInput != nil }
+    private var periodSuffix: String?
+    var hasPendingPeriod: Bool { periodSuffix != nil }
+    private static let domainSuffixes = ["com", "cn", "net", "org"]
     private static var contextRanking: ContextRanking?
     private var contextPrefix: String?
     private var mapping: [Int] = []
@@ -34,7 +37,7 @@ final class PinyinEngine {
     }
     deinit { TTDestroySession(id) }
     func prepareForCaretNavigation() {
-        guard !isLiteralInput else { return }
+        guard !isLiteralInput, !hasPendingPeriod else { return }
         manualHighlight = false; contextSuppressed = true
         _ = TTHighlightCandidate(id,0)
     }
@@ -43,12 +46,27 @@ final class PinyinEngine {
         contextPrefix = prefix
         if prefix == nil {
             contextActive = false
-            if !manualHighlight && !preserveHighlight { _ = TTHighlightCandidate(id,0) }
+            if !manualHighlight && !preserveHighlight && !hasPendingPeriod { _ = TTHighlightCandidate(id,0) }
             mapping = []
         }
     }
     func process(_ key: Int, modifiers: Int = 0) -> (Bool, PinyinSnapshot) {
         if isLiteralInput { return processLiteral(key) }
+        if let suffix = periodSuffix { return processPendingPeriod(key, modifiers:modifiers, suffix:suffix) }
+        if key == 46 && modifiers == 0 && lastState.selectionStart == 0 &&
+            lastState.caret == lastState.preedit.utf16.count && !lastState.input.isEmpty &&
+            lastState.input.utf8.allSatisfy(Self.isASCIILetter) {
+            let domain = lastState.input + "."
+            if domain.lowercased() == "www." { return (true,beginDomain(domain)) }
+            // Keep Rime's composition intact until we know whether this is a sentence boundary.
+            _ = snapshot()
+            periodSuffix = ""
+            contextActive = false
+            return (true,snapshot())
+        }
+        return processPinyin(key, modifiers:modifiers)
+    }
+    private func processPinyin(_ key: Int, modifiers: Int) -> (Bool, PinyinSnapshot) {
         if startsLiteralFragment(key), !lastState.input.isEmpty {
             // Symbols without a Chinese punctuation mapping start a literal
             // fragment. Chinese punctuation must reach Rime so it confirms the
@@ -91,6 +109,56 @@ final class PinyinEngine {
         let handled = TTProcessKey(id, Int32(key), Int32(modifiers))
         return (handled, snapshot())
     }
+    private static func isASCIILetter(_ value: UInt8) -> Bool {
+        (65...90).contains(value) || (97...122).contains(value)
+    }
+    private func beginDomain(_ text: String) -> PinyinSnapshot {
+        clear()
+        literalInput = text
+        literalCaret = text.utf16.count
+        return snapshot()
+    }
+    private func processPendingPeriod(_ key: Int, modifiers: Int, suffix: String) -> (Bool, PinyinSnapshot) {
+        if key == 0xff08 {
+            periodSuffix = suffix.isEmpty ? nil : String(suffix.dropLast())
+            return (true,snapshot())
+        }
+        if let byte = UInt8(exactly:key), Self.isASCIILetter(byte) {
+            let extended = suffix + String(UnicodeScalar(byte))
+            let lowercase = extended.lowercased()
+            if Self.domainSuffixes.contains(lowercase) {
+                return (true,beginDomain(lastState.input + "." + extended))
+            }
+            if Self.domainSuffixes.contains(where:{ $0.hasPrefix(lowercase) }) {
+                periodSuffix = extended
+                return (true,snapshot())
+            }
+        }
+        let resolved = resolvePeriod()
+        if key == 32 && resolved.input.isEmpty { return (true,resolved) }
+        let (handled,next) = process(key, modifiers:modifiers)
+        var state = next
+        state.commit = resolved.commit + state.commit
+        return (handled,state)
+    }
+    private func resolvePeriod(preserveSuffix: Bool = false) -> PinyinSnapshot {
+        guard let suffix = periodSuffix else { return snapshot() }
+        periodSuffix = nil
+        var state = processPinyin(46, modifiers:0).1
+        // Replay in the new sentence, before the host can supply a fresh prefix.
+        setContext(nil)
+        if preserveSuffix {
+            state.commit += suffix
+            return state
+        }
+        var committed = state.commit
+        for byte in suffix.utf8 {
+            state = processPinyin(Int(byte), modifiers:(65...90).contains(byte) ? 1 : 0).1
+            committed += state.commit
+        }
+        state.commit = committed
+        return state
+    }
     private func startsLiteralFragment(_ key:Int) -> Bool {
         let symbol = (33...47).contains(key) || (58...64).contains(key) ||
             (91...96).contains(key) || (123...126).contains(key)
@@ -106,18 +174,23 @@ final class PinyinEngine {
     private static let chinesePunctuationKeys = Set("!\"(),./:;<>?[\\]".unicodeScalars.map { Int($0.value) })
     func select(_ index: Int) -> PinyinSnapshot {
         if isLiteralInput { return index == 0 ? commit() : snapshot() }
+        if hasPendingPeriod { return index == 0 ? commit(preservePeriodSuffix:true) : snapshot() }
         let native = mapping.indices.contains(index) ? mapping[index] : index
         _ = TTSelectCandidate(id,Int32(native)); return snapshot()
     }
-    func commit() -> PinyinSnapshot {
+    func commit(preservePeriodSuffix: Bool = false) -> PinyinSnapshot {
         if let text = literalInput {
             clear()
             var state = PinyinSnapshot.empty; state.commit = text
             return state
         }
-        TTCommitComposition(id); return snapshot()
+        let prefix = hasPendingPeriod ? resolvePeriod(preserveSuffix:preservePeriodSuffix).commit : ""
+        TTCommitComposition(id)
+        var state = snapshot()
+        state.commit = prefix + state.commit
+        return state
     }
-    func clear() { TTClearComposition(id); literalInput = nil; literalCaret = 0; lastInput = ""; mapping = []; lastState = .empty; contextActive = false }
+    func clear() { TTClearComposition(id); literalInput = nil; literalCaret = 0; periodSuffix = nil; lastInput = ""; mapping = []; lastState = .empty; contextActive = false }
     private func processLiteral(_ key:Int) -> (Bool,PinyinSnapshot) {
         guard let text = literalInput else { return (false,snapshot()) }
         let value = text as NSString
@@ -150,6 +223,12 @@ final class PinyinEngine {
         return (true,snapshot())
     }
     func snapshot() -> PinyinSnapshot {
+        if let suffix = periodSuffix {
+            let text = lastState.preview + "。" + suffix
+            let length = text.utf16.count
+            return PinyinSnapshot(preedit:text,input:lastState.input + "." + suffix,preview:text,caret:length,
+                                  selectionStart:0,selectionEnd:length,candidates:[text],highlighted:0,page:0,lastPage:true,commit:"")
+        }
         if let text = literalInput {
             contextActive = false; mapping = [0]
             let state = PinyinSnapshot(preedit:text,input:text,preview:text,caret:literalCaret,selectionStart:0,selectionEnd:text.utf16.count,candidates:[text],highlighted:0,page:0,lastPage:true,commit:"")

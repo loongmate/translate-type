@@ -48,6 +48,14 @@ import Foundation
                         } else if spelling {
                             check(!engine.isLiteralInput && s.snapshot.input == prefix+String(scalar),label+"：隔音或双拼编码仍属于拼音")
                         } else if let punctuation = chinesePunctuation[scalar.value] {
+                            if key == 46 {
+                                check(s.markedText == before.preview+"。" && s.hasPendingInput && (mode == 0 ? output : s.draft).isEmpty,label+"：句号立即显示，暂留预编辑")
+                                switch mode {
+                                case 0: s.handle(key:32)
+                                case 1: s.handle(key:0xff0d)
+                                default: s.choose(0)
+                                }
+                            }
                             let result = mode == 0 ? output : s.draft
                             let endings = key == 34 ? ["“","”"] : [punctuation]
                             check(endings.contains(where:{ result == before.preview+$0 }) && !s.hasPendingInput && !engine.isLiteralInput,label+"：确认当前候选并输入中文标点，不退回原始字母")
@@ -112,6 +120,38 @@ import Foundation
                     type(text,in:s)
                     check((mode == 0 ? output : s.draft) == before+text && !s.hasPendingInput,"\(layout.name)/\(mode)：英文模式全部 32 种符号保持半角")
                 }
+                engine.clear()
+                let s = CompositionSession(engine:engine,translateEnabled:mode == 1)
+                var output = ""
+                s.onInsert = { output += $0 }
+                if mode == 2 { s.beginEditor() }
+                func result() -> String { mode == 0 ? output : s.draft }
+                let label = "\(layout.name)/\(mode)"
+                var confirmed = ""
+                for domain in ["baidu.com/a-b?x=1+2", "Example.CN", "example.net", "example.org", "www.baidu.com"] {
+                    type(domain,in:s)
+                    check(result() == confirmed && s.snapshot.input == domain && s.snapshot.preedit == domain && engine.isLiteralInput,label+"：\(domain) 整段保持原文")
+                    s.handle(key:32)
+                    confirmed += domain
+                    check(result() == confirmed && !s.hasPendingInput,label+"：原样提交域名后恢复拼音")
+                }
+                type(hello+".n",in:s)
+                check(result() == confirmed && s.snapshot.preedit == "你好。n",label+"：可能的网址后缀暂留预编辑")
+                type("i",in:s)
+                confirmed += "你好。"
+                check(result() == confirmed && s.snapshot.input == "ni" && !engine.hasPendingPeriod,label+"：排除网址后确认句号，完整重放后续拼音")
+                s.handle(key:0xff0d)
+                confirmed += "ni"
+                type(hello+".co",in:s)
+                for _ in 0..<3 { s.handle(key:0xff08) }
+                check(result() == confirmed && s.snapshot.input == hello && !engine.hasPendingPeriod,label+"：退格删掉后缀和句号后恢复原候选")
+                type(".,",in:s)
+                check(result() == confirmed+"你好。，" && !s.hasPendingInput,label+"：逗号紧接待定句号时两者立即提交")
+                if mode != 2 {
+                    type(hello+".",in:s)
+                    s.flushOriginal()
+                    check(output == confirmed+"你好。，你好。" && !s.hasPendingInput,label+"：宿主提交时保留待定句号并清理预编辑")
+                }
             }
             engine.clear()
             let spelling = CompositionSession(engine:engine,translateEnabled:false)
@@ -136,6 +176,15 @@ import Foundation
                 check(partial.snapshot.input == "你hao"+String(scalar) && partial.draft.isEmpty,"\(scalar)：普通符号保留已选中文前缀和原始尾部")
             }
         }
+        engine.clear()
+        let contextual = CompositionSession(engine:engine,translateEnabled:false)
+        var output = ""
+        contextual.onInsert = { output += $0 }
+        contextual.setContext("上")
+        type("hai.",in:contextual)
+        check(contextual.markedText == "海。" && output.isEmpty,"待定句号显示上下文排序后的高亮候选")
+        type("hai",in:contextual)
+        check(output == "海。" && contextual.snapshot.input == "hai" && !contextual.contextActive,"句号后的拼音不沿用上一句的上下文")
         print("ALL PUNCTUATION TESTS PASSED: \(cases) pending-input cases, \(checks) assertions")
     }
     @MainActor static func type(_ text:String,in session:CompositionSession) {
