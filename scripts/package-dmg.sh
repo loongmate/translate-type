@@ -14,7 +14,8 @@ SIGN_FLAGS=(--force --sign "$SIGN_ID")
 if [ "$SIGN_ID" != - ]; then SIGN_FLAGS+=(--options runtime --timestamp); fi
 codesign --verify --deep --strict "$APP"
 for RELATIVE in Contents/MacOS/TranslateType Contents/Frameworks/librime.1.dylib; do
-    lipo "$APP/$RELATIVE" -verify_arch x86_64 arm64
+    lipo "$APP/$RELATIVE" -verify_arch x86_64
+    lipo "$APP/$RELATIVE" -verify_arch arm64
 done
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
